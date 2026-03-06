@@ -5,18 +5,19 @@
 //!
 //! Thread-safety: `Qdrant` is Clone + Send + Sync.
 
-use qdrant_client::Qdrant;
 use crate::error::{NexusError, Result};
+use qdrant_client::Qdrant;
 
 /// Builds and returns an authenticated Qdrant client.
 pub fn build_qdrant_client() -> Result<Qdrant> {
-    let url = std::env::var("QDRANT_URL")
-        .map_err(|_| NexusError::EnvVar("QDRANT_URL".to_string()))?;
+    let url =
+        std::env::var("QDRANT_URL").map_err(|_| NexusError::EnvVar("QDRANT_URL".to_string()))?;
 
     let is_production = std::env::var("NEXUS_ENV").as_deref() == Ok("production");
     if is_production && url.starts_with("http://") {
         return Err(NexusError::Config(
-            "QDRANT_URL deve usar https:// ou grpcs:// em produção (NEXUS_ENV=production)".to_string(),
+            "QDRANT_URL deve usar https:// ou grpcs:// em produção (NEXUS_ENV=production)"
+                .to_string(),
         ));
     }
 

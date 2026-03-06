@@ -2,3 +2,7 @@ mistral-7b/
 backups/
 logs/
 dados/
+models/
+**/target/
+nexus_control_server/.state.json
+nexus_control_server/__pycache__/

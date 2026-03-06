@@ -6,8 +6,8 @@
 //!
 //! Thread-safety: stateless, safe to call from any context.
 
-use std::io::{self, Write};
 use crate::error::{NexusError, Result};
+use std::io::{self, Write};
 
 /// Requires a human to type "CONFIRMAR" before proceeding.
 ///

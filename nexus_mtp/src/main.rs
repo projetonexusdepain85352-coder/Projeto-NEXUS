@@ -191,6 +191,8 @@ async fn cmd_train(
         )));
     }
 
+    let base_model = resolve_base_model(base_model);
+
     let dataset_size = count_jsonl_lines(dataset)? as i32;
     let lora_alpha = lora_r * 2;
 
@@ -203,7 +205,7 @@ async fn cmd_train(
     );
     println!(
         "Modelo:  {}  Epochs: {}  LoRA r={} a={}",
-        base_model, epochs, lora_r, lora_alpha
+        &base_model, epochs, lora_r, lora_alpha
     );
 
     let config = serde_json::json!({
@@ -215,7 +217,7 @@ async fn cmd_train(
     });
 
     let cycle_id =
-        db::create_training_cycle(pool, domain, base_model, &config, dataset_size).await?;
+        db::create_training_cycle(pool, domain, &base_model, &config, dataset_size).await?;
     info!("Ciclo criado: {}", cycle_id);
 
     let ts = chrono::Utc::now().format("%Y%m%d_%H%M%S");
@@ -224,7 +226,7 @@ async fn cmd_train(
     let adapter_dir = PathBuf::from(MODELS_DIR).join("adapters").join(&model_name);
 
     let job = trainer::TrainJob {
-        base_model: base_model.to_string(),
+        base_model: base_model.clone(),
         dataset_path: dataset.clone(),
         domain: domain.to_string(),
         epochs,
@@ -269,7 +271,7 @@ async fn cmd_train(
         pool,
         &model_name,
         domain,
-        base_model,
+        &base_model,
         dataset_size,
         result.training_steps,
         &adapter_rel,
@@ -472,6 +474,15 @@ async fn cmd_stage_a_gate(pool: &sqlx::PgPool, cfg: &StageAGateConfig) -> Result
     Err(MtpError::StageAGateNotSatisfied(reasons.join(" | ")))
 }
 
+fn resolve_base_model(cli_base_model: &str) -> String {
+    if cli_base_model != DEFAULT_BASE_MODEL {
+        return cli_base_model.to_string();
+    }
+    match std::env::var("NEXUS_BASE_MODEL") {
+        Ok(v) if !v.trim().is_empty() => v,
+        _ => cli_base_model.to_string(),
+    }
+}
 fn build_db_url() -> Result<String> {
     let pw = std::env::var("KB_INGEST_PASSWORD")?;
     Ok(format!(

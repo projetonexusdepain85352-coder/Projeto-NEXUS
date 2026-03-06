@@ -2,10 +2,10 @@
 //!
 //! Thread-safety: `PgPool` is Clone + Send + Sync.
 
-use std::collections::HashMap;
 use chrono::{DateTime, Utc};
-use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
+use sqlx::postgres::PgPoolOptions;
+use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::error::{NexusError, Result};
@@ -14,14 +14,14 @@ use crate::error::{NexusError, Result};
 #[derive(Debug, Clone, sqlx::FromRow)]
 #[allow(dead_code)] // fields read by sqlx::FromRow macro
 pub struct DocumentRecord {
-    pub id:             Uuid,
-    pub source:         String,
-    pub domain:         String,
-    pub doc_type:       String,
-    pub content:        String,
+    pub id: Uuid,
+    pub source: String,
+    pub domain: String,
+    pub doc_type: String,
+    pub content: String,
     pub content_length: i32,
-    pub content_hash:   String,
-    pub collected_at:   DateTime<Utc>,
+    pub content_hash: String,
+    pub collected_at: DateTime<Utc>,
 }
 
 /// Builds a PostgreSQL connection pool for the `kb_reader` role.
@@ -37,11 +37,14 @@ pub async fn connect() -> Result<PgPool> {
     let host = std::env::var("POSTGRES_HOST").unwrap_or_else(|_| "localhost".to_string());
     let port = std::env::var("POSTGRES_PORT").unwrap_or_else(|_| "5432".to_string());
     // FIX 1: default is "knowledge_base", not "nexus"
-    let db   = std::env::var("POSTGRES_DB").unwrap_or_else(|_| "knowledge_base".to_string());
+    let db = std::env::var("POSTGRES_DB").unwrap_or_else(|_| "knowledge_base".to_string());
     let user = std::env::var("POSTGRES_USER").unwrap_or_else(|_| "kb_reader".to_string());
 
     let encoded_password = url_encode(&password);
-    let url = format!("postgresql://{}:{}@{}:{}/{}", user, encoded_password, host, port, db);
+    let url = format!(
+        "postgresql://{}:{}@{}:{}/{}",
+        user, encoded_password, host, port, db
+    );
 
     let pool = PgPoolOptions::new()
         .max_connections(5)
@@ -116,8 +119,9 @@ fn url_encode(s: &str) -> String {
     let mut out = String::with_capacity(s.len() * 3);
     for byte in s.bytes() {
         match byte {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9'
-            | b'-' | b'_' | b'.' | b'~' => out.push(byte as char),
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(byte as char)
+            }
             b => {
                 out.push('%');
                 out.push(hex_nibble(b >> 4));
@@ -130,8 +134,8 @@ fn url_encode(s: &str) -> String {
 
 fn hex_nibble(n: u8) -> char {
     match n {
-        0..=9   => (b'0' + n) as char,
+        0..=9 => (b'0' + n) as char,
         10..=15 => (b'A' + (n - 10)) as char,
-        _       => unreachable!(),
+        _ => unreachable!(),
     }
 }

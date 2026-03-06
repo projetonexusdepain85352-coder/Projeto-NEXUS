@@ -1,0 +1,11 @@
+{
+  "services": {
+    "sugestor": {
+      "command": ["{python}", "nexus_sugestor/servidor.py"],
+      "cwd": ".",
+      "env": {
+        "PYTHONUNBUFFERED": "1"
+      }
+    }
+  }
+}

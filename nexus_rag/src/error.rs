@@ -26,6 +26,9 @@ pub enum NexusError {
     #[error("UUID parse error: {0}")]
     UuidParse(#[from] uuid::Error),
 
+    #[error("Ungrounded response denied: {0}")]
+    Ungrounded(String),
+
     #[error("Operation cancelled by operator")]
     Cancelled,
 }

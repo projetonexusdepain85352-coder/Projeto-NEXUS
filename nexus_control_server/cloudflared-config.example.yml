@@ -1,0 +1,10 @@
+﻿# Example cloudflared config for named tunnel
+# Copy to ~/.cloudflared/config.yml and fill your values
+
+tunnel: nexus-control
+credentials-file: /home/your-user/.cloudflared/<tunnel-id>.json
+
+ingress:
+  - hostname: nexus-control.example.com
+    service: http://127.0.0.1:8787
+  - service: http_status:404

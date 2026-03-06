@@ -10,8 +10,8 @@
 //!
 //! Thread-safety: Embedder não é Send; crie um por tarefa.
 
-use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
 use crate::error::{NexusError, Result};
+use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
 
 pub const EMBEDDING_DIM: u64 = 384;
 const BATCH_SIZE: usize = 64;
@@ -31,8 +31,8 @@ impl Embedder {
             "Loading embedding model"
         );
 
-        let opts = InitOptions::new(EmbeddingModel::AllMiniLML6V2)
-            .with_show_download_progress(true);
+        let opts =
+            InitOptions::new(EmbeddingModel::AllMiniLML6V2).with_show_download_progress(true);
 
         let model = TextEmbedding::try_new(opts)
             .map_err(|e| NexusError::Embedding(format!("Failed to load model: {e}")))?;
@@ -44,7 +44,9 @@ impl Embedder {
     /// Embeds a single string. Returns Vec<f32> of length EMBEDDING_DIM.
     pub fn embed_one(&self, text: &str) -> Result<Vec<f32>> {
         if text.trim().is_empty() {
-            return Err(NexusError::Embedding("embed_one: input text is empty".to_string()));
+            return Err(NexusError::Embedding(
+                "embed_one: input text is empty".to_string(),
+            ));
         }
         let mut results = self
             .model
@@ -72,7 +74,8 @@ impl Embedder {
         if all.len() != texts.len() {
             return Err(NexusError::Embedding(format!(
                 "embed_batch: expected {} vectors, got {}",
-                texts.len(), all.len()
+                texts.len(),
+                all.len()
             )));
         }
         Ok(all)
