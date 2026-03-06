@@ -1,0 +1,2 @@
+ M scripts/backup_snapshot.ps1
+ M validador/src/main.rs
