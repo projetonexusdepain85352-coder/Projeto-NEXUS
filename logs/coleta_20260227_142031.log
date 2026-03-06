@@ -1,0 +1,80 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.28s
+     Running `target/debug/agente_intermediario`
+Conectado ao banco. Iniciando coleta...
+
+
+[FONTE] https://owasp.org/Top10/2025/ (security)
+  [OK] (1/100) https://owasp.org/Top10/2025/ (1153 bytes texto)
+  [FILTRADO] https://owasp.org/Top10/2025/en/ — conteudo muito curto
+  [OK] (2/100) https://owasp.org/Top10/2025/0x00_2025-Introduction/ (13268 bytes texto)
+  [OK] (3/100) https://owasp.org/Top10/2025/0x01_2025-About_OWASP/ (1914 bytes texto)
+  [OK] (4/100) https://owasp.org/Top10/2025/0x02_2025-What_are_Application_Security_Risks/ (6608 bytes texto)
+  [FILTRADO] https://owasp.org/Top10/2025/0x03_2025-Establishing_a_Modern_Application_Security_Program/ — muitas linhas duplicadas (indice/navegacao)
+  [OK] (5/100) https://owasp.org/Top10/2025/A01_2025-Broken_Access_Control/ (9411 bytes texto)
+  [OK] (6/100) https://owasp.org/Top10/2025/A02_2025-Security_Misconfiguration/ (6864 bytes texto)
+  [OK] (7/100) https://owasp.org/Top10/2025/A03_2025-Software_Supply_Chain_Failures/ (9781 bytes texto)
+  [OK] (8/100) https://owasp.org/Top10/2025/A04_2025-Cryptographic_Failures/ (10973 bytes texto)
+  [OK] (9/100) https://owasp.org/Top10/2025/A05_2025-Injection/ (11244 bytes texto)
+  [OK] (10/100) https://owasp.org/Top10/2025/A06_2025-Insecure_Design/ (11453 bytes texto)
+  [FILTRADO] https://owasp.org/Top10/2025/A07_2025-Authentication_Failures/ — muitas linhas duplicadas (indice/navegacao)
+  [OK] (11/100) https://owasp.org/Top10/2025/A08_2025-Software_or_Data_Integrity_Failures/ (6796 bytes texto)
+  [OK] (12/100) https://owasp.org/Top10/2025/A09_2025-Security_Logging_and_Alerting_Failures/ (8165 bytes texto)
+  [OK] (13/100) https://owasp.org/Top10/2025/A10_2025-Mishandling_of_Exceptional_Conditions/ (8717 bytes texto)
+  [OK] (14/100) https://owasp.org/Top10/2025/X01_2025-Next_Steps/ (17129 bytes texto)
+  [RESUMO] visitadas=17 inseridos=14 filtrados=3 ignorados=0 erros=0
+
+[FONTE] https://www.rfc-editor.org/rfc/rfc8446 (security)
+  [PDF] Baixando https://www.rfc-editor.org/rfc/pdfrfc/rfc8446.txt.pdf
+  [PDF OK] (1/100) https://www.rfc-editor.org/rfc/pdfrfc/rfc8446.txt.pdf (11679 bytes)
+  [OK] (2/100) https://www.rfc-editor.org/rfc/rfc8446 (284396 bytes texto)
+  [OK] (3/100) https://www.rfc-editor.org/rfc/rfc8446.txt (279904 bytes texto)
+  [RESUMO] visitadas=3 inseridos=3 filtrados=0 ignorados=2 erros=0
+
+[FONTE] https://www.nist.gov/cyberframework (security)
+  [OK] (1/100) https://www.nist.gov/cyberframework (970 bytes texto)
+  [FILTRADO] https://www.nist.gov/cyberframework/quick-start-guides — muitas linhas duplicadas (indice/navegacao)
+  [OK] (2/100) https://www.nist.gov/cyberframework/profiles (1715 bytes texto)
+  [OK] (3/100) https://www.nist.gov/cyberframework/informative-references (1543 bytes texto)
+  [OK] (4/100) https://www.nist.gov/cyberframework/faqs (36160 bytes texto)
+  [OK] (5/100) https://www.nist.gov/cyberframework/videos (885 bytes texto)
+  [OK] (6/100) https://www.nist.gov/cyberframework/translations (3971 bytes texto)
+  [OK] (7/100) https://www.nist.gov/cyberframework/csf-20-resources-0 (1833 bytes texto)
+  [OK] (8/100) https://www.nist.gov/cyberframework/news-and-events (463 bytes texto)
+  [OK] (9/100) https://www.nist.gov/cyberframework/related-programs (1920 bytes texto)
+  [OK] (10/100) https://www.nist.gov/cyberframework/ways-engage (1039 bytes texto)
+  [OK] (11/100) https://www.nist.gov/cyberframework/csf-11-archive (1848 bytes texto)
+  [OK] (12/100) https://www.nist.gov/cyberframework/updates-archive (640 bytes texto)
+  [OK] (13/100) https://www.nist.gov/cyberframework/csf-11-archive/community-profiles (2309 bytes texto)
+  [OK] (14/100) https://www.nist.gov/cyberframework/framework-development-archive (5917 bytes texto)
+  [OK] (15/100) https://www.nist.gov/cyberframework/risk-management-resources (2042 bytes texto)
+  [OK] (16/100) https://www.nist.gov/cyberframework/events-and-presentation-archive (29000 bytes texto)
+  [OK] (17/100) https://www.nist.gov/cyberframework/success-stories (1835 bytes texto)
+  [OK] (18/100) https://www.nist.gov/cyberframework/perspectives (16200 bytes texto)
+  [OK] (19/100) https://www.nist.gov/cyberframework/csf-11-quick-start-guide (2224 bytes texto)
+  [OK] (20/100) https://www.nist.gov/cyberframework/getting-started/online-learning (1183 bytes texto)
+  [OK] (21/100) https://www.nist.gov/cyberframework/updating-nist-cybersecurity-framework-journey-csf-20 (1270 bytes texto)
+  [OK] (22/100) https://www.nist.gov/cyberframework/comments-received-rfi-about-evaluating-and-improving-cybersecurity-resources (5049 bytes texto)
+  [OK] (23/100) https://www.nist.gov/cyberframework/request-information-about-evaluating-and-improving-cybersecurity-resources (1735 bytes texto)
+  [OK] (24/100) https://www.nist.gov/cyberframework/success-stories/lower-colorado-river-authority (3538 bytes texto)
+  [OK] (25/100) https://www.nist.gov/cyberframework/csf-11-international-resources (2687 bytes texto)
+  [OK] (26/100) https://www.nist.gov/cyberframework/csf-11-critical-infrastructure-resources (1069 bytes texto)
+  [OK] (27/100) https://www.nist.gov/cyberframework/success-stories/israel-national-cyber-directorate-version-20 (1153 bytes texto)
+  [OK] (28/100) https://www.nist.gov/cyberframework/picking-frameworks-pace-internationally (5951 bytes texto)
+  [OK] (29/100) https://www.nist.gov/cyberframework/nist-sessions-rsa-2019 (12418 bytes texto)
+  [OK] (30/100) https://www.nist.gov/cyberframework/cybersecurity-framework-impacts (626 bytes texto)
+  [OK] (31/100) https://www.nist.gov/cyberframework/success-stories/stories (2589 bytes texto)
+  [RESUMO] visitadas=34 inseridos=31 filtrados=1 ignorados=2 erros=0
+
+[FONTE API] NVD CVE Database (security)
+  Buscando CVEs 0 a 2000...
+  [OK] nvd-api-cves-0-2000 (4000190 bytes)
+  Buscando CVEs 2000 a 4000...
+  [OK] nvd-api-cves-2000-4000 (5021306 bytes)
+  Buscando CVEs 4000 a 6000...
+  [OK] nvd-api-cves-4000-6000 (6187992 bytes)
+  Buscando CVEs 6000 a 8000...
+  [OK] nvd-api-cves-6000-8000 (6337134 bytes)
+  Buscando CVEs 8000 a 10000...
+  [OK] nvd-api-cves-8000-10000 (8151979 bytes)
+  Buscando CVEs 10000 a 12000...
+  [OK] nvd-api-cves-10000-12000 (7718061 bytes)

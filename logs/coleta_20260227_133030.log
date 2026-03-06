@@ -1,0 +1,16 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.31s
+     Running `target/debug/agente_intermediario`
+Conectado ao banco. Iniciando coleta...
+
+
+[FONTE] https://owasp.org/www-project-top-ten/ (security)
+  [PDF] Baixando https://owasp.org/www-pdf-archive/OWASP_Top_10-2017_%28en%29.pdf.pdf
+  [PDF ERRO EXTRACAO] https://owasp.org/www-pdf-archive/OWASP_Top_10-2017_%28en%29.pdf.pdf: Nao foi possivel extrair texto do PDF
+  [PDF] Baixando https://owasp.org/www-pdf-archive/OWASP_Top_10-2017_%28en%29.pdf.pdf
+  [PDF ERRO EXTRACAO] https://owasp.org/www-pdf-archive/OWASP_Top_10-2017_%28en%29.pdf.pdf: Nao foi possivel extrair texto do PDF
+  [OK] (1/100) https://owasp.org/www-project-top-ten/ (16975 bytes texto)
+  [OK] (2/100) https://owasp.org/www-project-top-ten/2017 (2538 bytes texto)
+  [OK] (3/100) https://owasp.org/www-project-top-ten/2017/Foreword (3013 bytes texto)
+  [OK] (4/100) https://owasp.org/www-project-top-ten/2017/Introduction.html (4860 bytes texto)
+  [OK] (5/100) https://owasp.org/www-project-top-ten/2017/Release_Notes.html (3566 bytes texto)
+  [OK] (6/100) https://owasp.org/www-project-top-ten/2017/Application_Security_Risks.html (2757 bytes texto)
