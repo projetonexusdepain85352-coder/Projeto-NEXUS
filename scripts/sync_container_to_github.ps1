@@ -25,6 +25,33 @@ function Run-External([scriptblock]$Command, [string]$ErrorMessage) {
     }
 }
 
+function Get-BranchSyncState([string]$Branch) {
+    & git rev-parse --verify "origin/$Branch" *> $null
+    if ($LASTEXITCODE -ne 0) {
+        return [pscustomobject]@{
+            HasTracking = $false
+            Ahead = 0
+            Behind = 0
+        }
+    }
+
+    $raw = (& git rev-list --left-right --count "origin/$Branch...HEAD").Trim()
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($raw)) {
+        throw "Unable to compute ahead/behind for origin/$Branch"
+    }
+
+    $parts = $raw -split '\s+'
+    if ($parts.Length -lt 2) {
+        throw "Unexpected rev-list format: $raw"
+    }
+
+    return [pscustomobject]@{
+        HasTracking = $true
+        Behind = [int]$parts[0]
+        Ahead = [int]$parts[1]
+    }
+}
+
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $branch = (& git -C $repoRoot branch --show-current).Trim()
@@ -100,14 +127,29 @@ try {
     if ($LASTEXITCODE -ne 0) {
         Run-External { git commit -m "backup(container): sync $ContainerName at $timestamp" } "git commit failed"
         Write-Info "Commit created on branch $branch"
-
-        if ($Push) {
-            Run-External { git push origin $branch } "git push failed. Check remote URL and credentials."
-            Write-Info "Pushed to origin/$branch"
-        }
     }
     else {
         Write-Info "No staged changes to commit."
+    }
+
+    if ($Push) {
+        $sync = Get-BranchSyncState -Branch $branch
+
+        if (-not $sync.HasTracking) {
+            Write-Info "No origin/$branch tracking ref found. Pushing by default."
+            Run-External { git push origin $branch } "git push failed. Check remote URL and credentials."
+            Write-Info "Pushed to origin/$branch"
+        }
+        elseif ($sync.Behind -gt 0 -and $sync.Ahead -gt 0) {
+            throw "Branch diverged from origin/$branch (ahead=$($sync.Ahead), behind=$($sync.Behind)). Rebase/pull before push."
+        }
+        elseif ($sync.Ahead -eq 0) {
+            Write-Info "Already synchronized with origin/$branch. Push skipped."
+        }
+        else {
+            Run-External { git push origin $branch } "git push failed. Check remote URL and credentials."
+            Write-Info "Pushed to origin/$branch"
+        }
     }
 }
 finally {
