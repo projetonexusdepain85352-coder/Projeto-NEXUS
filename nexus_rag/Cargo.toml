@@ -1,0 +1,31 @@
+[package]
+name = "nexus_rag"
+version = "0.1.0"
+edition = "2024"
+authors = ["NEXUS Team"]
+description = "RAG component for the NEXUS private AI system"
+
+[[bin]]
+name = "nexus_rag"
+path = "src/main.rs"
+
+[dependencies]
+clap              = { version = "4.5.20",  features = ["derive"] }
+tokio             = { version = "1.40.0",  features = ["full", "signal"] }
+sqlx              = { version = "0.8.2",   features = ["postgres", "runtime-tokio", "tls-rustls", "uuid", "chrono"] }
+qdrant-client     = "1.12.1"
+fastembed         = "4.3.0"
+serde             = { version = "1.0.210", features = ["derive"] }
+serde_json        = "1.0.128"
+uuid              = { version = "1.10.0",  features = ["v4", "serde"] }
+chrono            = { version = "0.4.38",  features = ["serde"] }
+thiserror         = "1.0.64"
+anyhow            = "1.0.89"
+tracing           = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter", "fmt", "ansi", "json"] }
+
+[profile.release]
+opt-level       = 3
+lto             = true
+codegen-units   = 1
+strip           = true

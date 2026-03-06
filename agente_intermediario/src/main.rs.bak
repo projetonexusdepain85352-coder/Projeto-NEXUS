@@ -1,0 +1,444 @@
+use sha2::{Sha256, Digest};
+use uuid::Uuid;
+use scraper::{Html, Selector};
+use std::collections::{HashSet, VecDeque};
+
+struct Config {
+    max_paginas: usize,
+    max_profundidade: usize,
+    delay_ms: u64,
+}
+
+// Extensões binárias que devem ser ignoradas
+const EXTENSOES_BINARIAS: &[&str] = &[
+    ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".ico",
+    ".woff", ".woff2", ".ttf", ".eot", ".otf",
+    ".zip", ".tar", ".gz", ".bz2", ".xz",
+    ".pdf", ".doc", ".docx", ".xls", ".xlsx",
+    ".mp4", ".mp3", ".avi", ".mov", ".webm",
+    ".exe", ".dll", ".so", ".dylib",
+    ".css", ".map",
+];
+
+// Padrões de versão em URLs (HuggingFace, etc.)
+const PADROES_VERSAO: &[&str] = &[
+    "/v0.", "/v1.", "/v2.", "/v3.", "/v4.", "/v5.",
+    "/v6.", "/v7.", "/v8.", "/v9.",
+];
+
+fn url_e_binaria(url: &str) -> bool {
+    let url_lower = url.to_lowercase();
+    let caminho = url_lower.split('?').next().unwrap_or(&url_lower);
+    EXTENSOES_BINARIAS.iter().any(|ext| caminho.ends_with(ext))
+}
+
+fn url_tem_versao(url: &str) -> bool {
+    PADROES_VERSAO.iter().any(|p| url.contains(p))
+}
+
+fn baixar_conteudo(url: &str) -> Result<String, Box<dyn std::error::Error>> {
+    let cliente = reqwest::blocking::Client::builder()
+        .user_agent("NEXUS-Agent/0.1")
+        .timeout(std::time::Duration::from_secs(30))
+        .build()?;
+    let resposta = cliente.get(url).send()?;
+    let conteudo = resposta.text()?;
+    Ok(conteudo)
+}
+
+fn extrair_texto_limpo(html: &str) -> String {
+    let documento = Html::parse_document(html);
+    let seletor_conteudo = Selector::parse(
+        "p, h1, h2, h3, h4, h5, h6, li, td, th, pre, code, blockquote, article, section, main"
+    ).unwrap();
+
+    let mut texto = String::new();
+
+    for elemento in documento.select(&seletor_conteudo) {
+        let texto_elem = elemento.text().collect::<Vec<_>>().join(" ");
+        let texto_elem = texto_elem.trim().to_string();
+        if !texto_elem.is_empty() && texto_elem.len() > 10 {
+            texto.push_str(&texto_elem);
+            texto.push('\n');
+        }
+    }
+
+    // Fallback se não extraiu conteúdo útil
+    if texto.trim().len() < 100 {
+        let doc2 = Html::parse_document(html);
+        texto = doc2.root_element().text().collect::<Vec<_>>().join(" ");
+        texto = texto.split_whitespace().collect::<Vec<_>>().join(" ");
+    }
+
+    texto
+}
+
+fn extrair_links(html: &str, base_url: &str) -> Vec<String> {
+    let documento = Html::parse_document(html);
+    let seletor = Selector::parse("a[href]").unwrap();
+    let base = match url::Url::parse(base_url) {
+        Ok(u) => u,
+        Err(_) => return vec![],
+    };
+    let mut links = Vec::new();
+    let partes_ignorar = [
+        "/de/", "/fr/", "/es/", "/pt/", "/zh/", "/ja/",
+        "/ko/", "/ru/", "/it/", "/pl/", "/nl/",
+    ];
+
+    for elemento in documento.select(&seletor) {
+        if let Some(href) = elemento.value().attr("href") {
+            if let Ok(url_absoluta) = base.join(href) {
+                let url_str = url_absoluta.to_string();
+                if url_str.starts_with(base_url) {
+                    let ignorar_idioma = partes_ignorar.iter().any(|p| url_str.contains(p));
+                    let ignorar_versao = url_tem_versao(&url_str);
+                    let ignorar_binario = url_e_binaria(&url_str);
+
+                    if !ignorar_idioma && !ignorar_versao && !ignorar_binario {
+                        let sem_fragmento = url_str.split('#').next()
+                            .unwrap_or(&url_str).to_string();
+                        if !sem_fragmento.is_empty() {
+                            links.push(sem_fragmento);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    links
+}
+
+fn calcular_hash(conteudo: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(conteudo.as_bytes());
+    hex::encode(hasher.finalize())
+}
+
+fn hash_armazenado(client: &mut postgres::Client, url: &str) -> Option<String> {
+    match client.query_opt(
+        "SELECT content_hash FROM documents WHERE source = $1 ORDER BY collected_at DESC LIMIT 1",
+        &[&url],
+    ) {
+        Ok(Some(row)) => Some(row.get(0)),
+        _ => None,
+    }
+}
+
+fn e_erro_duplicata(e: &Box<dyn std::error::Error>) -> bool {
+    let msg = format!("{:?}", e);
+    msg.contains("duplicate key") || msg.contains("E23505")
+}
+
+fn atualizar_documento(
+    client: &mut postgres::Client,
+    url: &str,
+    conteudo: &str,
+    hash: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let tamanho = conteudo.len() as i32;
+    client.execute(
+        "UPDATE documents SET content = $1, content_hash = $2, content_length = $3, collected_at = NOW()
+         WHERE source = $4",
+        &[&conteudo, &hash, &tamanho, &url],
+    )?;
+    println!("  [ATUALIZADO] {} ({} bytes)", url, conteudo.len());
+    Ok(())
+}
+
+fn inserir_documento(
+    client: &mut postgres::Client,
+    url: &str,
+    domain: &str,
+    doc_type: &str,
+    conteudo: &str,
+    hash: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let id = Uuid::new_v4();
+    let tamanho = conteudo.len() as i32;
+
+    client.execute(
+        "INSERT INTO documents (id, content, source, domain, doc_type, content_hash, content_length, inserted_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'agent')",
+        &[&id, &conteudo, &url, &domain, &doc_type, &hash, &tamanho],
+    )?;
+
+    let val_id = Uuid::new_v4();
+    client.execute(
+        "INSERT INTO validation (id, document_id, status, decided_by)
+         VALUES ($1, $2, 'pending', 'agent')",
+        &[&val_id, &id],
+    )?;
+
+    Ok(())
+}
+
+fn processar_pagina(
+    client: &mut postgres::Client,
+    url: &str,
+    domain: &str,
+    doc_type: &str,
+    html: &str,
+    inseridos: &mut usize,
+    ignorados: &mut usize,
+    erros: &mut usize,
+    max_paginas: usize,
+) {
+    let texto = extrair_texto_limpo(html);
+
+    if texto.trim().len() < 50 {
+        *ignorados += 1;
+        return;
+    }
+
+    let hash = calcular_hash(&texto);
+
+    match hash_armazenado(client, url) {
+        Some(hash_antigo) => {
+            if hash_antigo == hash {
+                *ignorados += 1;
+            } else {
+                match atualizar_documento(client, url, &texto, &hash) {
+                    Ok(_) => *inseridos += 1,
+                    Err(e) => {
+                        *erros += 1;
+                        eprintln!("  [ERRO UPDATE] {}: {:?}", url, e);
+                    }
+                }
+            }
+        }
+        None => {
+            match inserir_documento(client, url, domain, doc_type, &texto, &hash) {
+                Ok(_) => {
+                    *inseridos += 1;
+                    println!("  [OK] ({}/{}) {} ({} bytes texto)",
+                        inseridos, max_paginas, url, texto.len());
+                }
+                Err(e) => {
+                    if e_erro_duplicata(&e) {
+                        // Mesmo conteúdo, URL diferente — deduplicação correta
+                        *ignorados += 1;
+                    } else {
+                        *erros += 1;
+                        eprintln!("  [ERRO DB] {}: {:?}", url, e);
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn coletar_crawling(
+    client: &mut postgres::Client,
+    url_base: &str,
+    domain: &str,
+    doc_type: &str,
+    config: &Config,
+) {
+    println!("\n[FONTE] {} ({})", url_base, domain);
+
+    let mut visitados: HashSet<String> = HashSet::new();
+    let mut fila: VecDeque<(String, usize)> = VecDeque::new();
+    let mut inseridos = 0;
+    let mut ignorados = 0;
+    let mut erros = 0;
+    let mut visitadas = 0;
+
+    fila.push_back((url_base.to_string(), 0));
+
+    while let Some((url_atual, profundidade)) = fila.pop_front() {
+        if visitados.contains(&url_atual) {
+            continue;
+        }
+        // Limite por páginas visitadas, não por inserções
+        if visitadas >= config.max_paginas * 3 {
+            println!("  [LIMITE] {} páginas visitadas", visitadas);
+            break;
+        }
+        if inseridos >= config.max_paginas {
+            println!("  [LIMITE] {} inserções atingido", config.max_paginas);
+            break;
+        }
+
+        // Pula binários
+        if url_e_binaria(&url_atual) {
+            ignorados += 1;
+            visitados.insert(url_atual);
+            continue;
+        }
+
+        visitados.insert(url_atual.clone());
+        visitadas += 1;
+
+        match baixar_conteudo(&url_atual) {
+            Ok(html) => {
+                let links = if profundidade < config.max_profundidade {
+                    extrair_links(&html, url_base)
+                } else {
+                    vec![]
+                };
+
+                processar_pagina(
+                    client, &url_atual, domain, doc_type, &html,
+                    &mut inseridos, &mut ignorados, &mut erros, config.max_paginas,
+                );
+
+                for link in links {
+                    if !visitados.contains(&link) {
+                        fila.push_back((link, profundidade + 1));
+                    }
+                }
+            }
+            Err(e) => {
+                erros += 1;
+                eprintln!("  [ERRO HTTP] {}: {}", url_atual, e);
+            }
+        }
+
+        std::thread::sleep(std::time::Duration::from_millis(config.delay_ms));
+    }
+
+    println!("  [RESUMO] visitadas={} inseridos={} ignorados={} erros={}",
+        visitadas, inseridos, ignorados, erros);
+}
+
+fn coletar_nvd(client: &mut postgres::Client) {
+    println!("\n[FONTE API] NVD CVE Database (security)");
+
+    let http = reqwest::blocking::Client::builder()
+        .user_agent("NEXUS-Agent/0.1")
+        .timeout(std::time::Duration::from_secs(60))
+        .build()
+        .unwrap();
+
+    let mut inseridos = 0;
+    let mut ignorados = 0;
+    let mut erros = 0;
+    let por_pagina = 2000;
+    let max_cves = 20000;
+    let mut inicio = 0;
+
+    loop {
+        if inicio >= max_cves {
+            break;
+        }
+
+        let source_url = format!("nvd-api-cves-{}-{}", inicio, inicio + por_pagina);
+        let api_url = format!(
+            "https://services.nvd.nist.gov/rest/json/cves/2.0?resultsPerPage={}&startIndex={}",
+            por_pagina, inicio
+        );
+
+        println!("  Buscando CVEs {} a {}...", inicio, inicio + por_pagina);
+
+        match http.get(&api_url).send() {
+            Ok(resp) => {
+                match resp.text() {
+                    Ok(conteudo) => {
+                        if conteudo.len() < 100 {
+                            erros += 1;
+                            eprintln!("  [ERRO] Resposta vazia para bloco {}", inicio);
+                            inicio += por_pagina;
+                            std::thread::sleep(std::time::Duration::from_secs(6));
+                            continue;
+                        }
+
+                        let hash = calcular_hash(&conteudo);
+
+                        match hash_armazenado(client, &source_url) {
+                            Some(h) if h == hash => { ignorados += 1; }
+                            Some(_) => {
+                                let _ = atualizar_documento(client, &source_url, &conteudo, &hash);
+                                inseridos += 1;
+                            }
+                            None => {
+                                match inserir_documento(client, &source_url, "security", "cve", &conteudo, &hash) {
+                                    Ok(_) => {
+                                        inseridos += 1;
+                                        println!("  [OK] {} ({} bytes)", source_url, conteudo.len());
+                                    }
+                                    Err(e) => {
+                                        if e_erro_duplicata(&e) {
+                                            ignorados += 1;
+                                        } else {
+                                            erros += 1;
+                                            eprintln!("  [ERRO DB] {:?}", e);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        erros += 1;
+                        eprintln!("  [ERRO] Falha ao ler resposta: {}", e);
+                    }
+                }
+            }
+            Err(e) => {
+                erros += 1;
+                eprintln!("  [ERRO HTTP] {}", e);
+            }
+        }
+
+        inicio += por_pagina;
+        std::thread::sleep(std::time::Duration::from_secs(6));
+    }
+
+    println!("  [RESUMO NVD] inseridos={} ignorados={} erros={}", inseridos, ignorados, erros);
+}
+
+fn main() {
+    let senha = std::env::var("KB_INGEST_PASSWORD").unwrap_or_else(|_| {
+        eprintln!("[ERRO] Variável de ambiente KB_INGEST_PASSWORD não definida.");
+        std::process::exit(1);
+    });
+
+    let conn_str = format!(
+        "host=localhost port=5432 dbname=knowledge_base user=kb_ingest password={}",
+        senha
+    );
+
+    let mut client = match postgres::Client::connect(&conn_str, postgres::NoTls) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("[ERRO] Falha ao conectar ao banco: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    println!("Conectado ao banco. Iniciando coleta...\n");
+
+    let config = Config {
+        max_paginas: 100,
+        max_profundidade: 2,
+        delay_ms: 600,
+    };
+
+    // SECURITY
+    coletar_crawling(&mut client, "https://owasp.org/www-project-top-ten/", "security", "documentation", &config);
+    coletar_crawling(&mut client, "https://www.rfc-editor.org/rfc/rfc8446", "security", "rfc", &config);
+    coletar_crawling(&mut client, "https://www.nist.gov/cyberframework", "security", "documentation", &config);
+    coletar_nvd(&mut client);
+
+    // RUST
+    coletar_crawling(&mut client, "https://doc.rust-lang.org/stable/reference/", "rust", "documentation", &config);
+    coletar_crawling(&mut client, "https://doc.rust-lang.org/nomicon/", "rust", "documentation", &config);
+    coletar_crawling(&mut client, "https://doc.rust-lang.org/book/", "rust", "documentation", &config);
+    coletar_crawling(&mut client, "https://doc.rust-lang.org/std/", "rust", "documentation", &config);
+    coletar_crawling(&mut client, "https://doc.rust-lang.org/cargo/", "rust", "documentation", &config);
+
+    // INFRA
+    coletar_crawling(&mut client, "https://www.kernel.org/doc/html/latest/", "infra", "documentation", &config);
+    coletar_crawling(&mut client, "https://docs.docker.com/", "infra", "documentation", &config);
+    coletar_crawling(&mut client, "https://www.postgresql.org/docs/17/", "infra", "documentation", &config);
+    coletar_crawling(&mut client, "https://systemd.io/", "infra", "documentation", &config);
+
+    // MLOPS
+    coletar_crawling(&mut client, "https://arxiv.org/abs/2305.14314", "mlops", "paper", &config);
+    coletar_crawling(&mut client, "https://huggingface.co/docs/peft/", "mlops", "documentation", &config);
+    coletar_crawling(&mut client, "https://huggingface.co/docs/transformers/", "mlops", "documentation", &config);
+    coletar_crawling(&mut client, "https://github.com/ggerganov/llama.cpp/blob/master/README.md", "mlops", "documentation", &config);
+
+    println!("\nColeta finalizada.");
+}
