@@ -1,0 +1,11 @@
+{
+  "timestamp": "20260306_111751",
+  "container": "pg_copia",
+  "image": "meu_postgres_com_dados:latest",
+  "branch": "main",
+  "files": {
+    "knowledge_base.dump.sha256": "60C40800307009187B73E83CF90C1BA8A22D6D32F71744706D4B8853BAFF7F80",
+    "knowledge_base_schema.sql.sha256": "C2DF46ED17093205AAF9C725FD6C09CC9671B11AF06280E86D522CB5C8CB01A6",
+    "validation_stats.txt.sha256": "82DA37D9E8F6908162C507A80B3B13FF8AA25477F38122A50D492168ED952A73"
+  }
+}
