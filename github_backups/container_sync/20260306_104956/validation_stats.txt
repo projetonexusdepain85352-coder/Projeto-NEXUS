@@ -1,0 +1,7 @@
+  status  | count 
+----------+-------
+ approved |   495
+ pending  |   901
+ rejected |    12
+(3 rows)
+
