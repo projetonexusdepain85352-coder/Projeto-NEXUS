@@ -6,35 +6,47 @@ use crate::error::{MtpError, Result};
 
 #[derive(Debug, sqlx::FromRow)]
 struct BenchmarkQuestion {
-    question:          String,
+    question: String,
     expected_keywords: Vec<String>,
 }
 
 pub async fn run_benchmark(
-    pool:          &PgPool,
-    model_id:      Uuid,
+    pool: &PgPool,
+    model_id: Uuid,
     _adapter_path: &str,
-    base_model:    &str,
-    domain:        &str,
+    base_model: &str,
+    domain: &str,
 ) -> Result<f32> {
     let questions = fetch_benchmark_questions(pool, domain).await;
     let questions = match questions {
         Err(e) => {
-            warn!("Benchmarks indisponiveis para '{}': {}. Score = 0.0", domain, e);
+            warn!(
+                "Benchmarks indisponiveis para '{}': {}. Score = 0.0",
+                domain, e
+            );
             return Ok(0.0);
         }
         Ok(v) if v.is_empty() => {
-            warn!("Nenhuma pergunta de benchmark para '{}'. Score = 0.0", domain);
+            warn!(
+                "Nenhuma pergunta de benchmark para '{}'. Score = 0.0",
+                domain
+            );
             return Ok(0.0);
         }
         Ok(v) => v,
     };
-    info!("{} perguntas para '{}' (modelo {})...", questions.len(), domain, model_id);
+    info!(
+        "{} perguntas para '{}' (modelo {})...",
+        questions.len(),
+        domain,
+        model_id
+    );
     run_candle_benchmark(&questions, base_model)
 }
 
 async fn fetch_benchmark_questions(
-    pool: &PgPool, domain: &str,
+    pool: &PgPool,
+    domain: &str,
 ) -> std::result::Result<Vec<BenchmarkQuestion>, sqlx::Error> {
     sqlx::query_as::<_, BenchmarkQuestion>(
         "SELECT question, expected_keywords FROM benchmark_questions WHERE domain = $1 ORDER BY id",
@@ -54,8 +66,8 @@ fn run_candle_benchmark(questions: &[BenchmarkQuestion], base_model: &str) -> Re
     info!("Dispositivo: {:?}", device);
 
     let tokenizer_path = locate_hf_file(base_model, "tokenizer.json")?;
-    let config_path    = locate_hf_file(base_model, "config.json")?;
-    let weight_files   = find_weight_files(base_model)?;
+    let config_path = locate_hf_file(base_model, "config.json")?;
+    let weight_files = find_weight_files(base_model)?;
 
     let tokenizer = Tokenizer::from_file(&tokenizer_path)
         .map_err(|e| MtpError::Other(format!("tokenizer: {e}")))?;
@@ -74,9 +86,14 @@ fn run_candle_benchmark(questions: &[BenchmarkQuestion], base_model: &str) -> Re
     for q in questions {
         match generate_greedy(&mut model, &tokenizer, &q.question, &device) {
             Ok(resp) => {
-                let r   = resp.to_lowercase();
-                let hit = q.expected_keywords.iter().all(|kw| r.contains(&kw.to_lowercase()));
-                if hit { hits += 1; }
+                let r = resp.to_lowercase();
+                let hit = q
+                    .expected_keywords
+                    .iter()
+                    .all(|kw| r.contains(&kw.to_lowercase()));
+                if hit {
+                    hits += 1;
+                }
                 info!("Q: {:.60}... | hit={}", q.question, hit);
             }
             Err(e) => warn!("Inferencia falhou: {}", e),
@@ -89,10 +106,10 @@ fn run_candle_benchmark(questions: &[BenchmarkQuestion], base_model: &str) -> Re
 /// corrija os argumentos aqui.
 /// Assinatura esperada: forward(&mut self, x: &Tensor, seqlen_offset: usize)
 fn generate_greedy(
-    model:     &mut candle_transformers::models::mistral::Model,
+    model: &mut candle_transformers::models::mistral::Model,
     tokenizer: &tokenizers::Tokenizer,
-    question:  &str,
-    device:    &candle_core::Device,
+    question: &str,
+    device: &candle_core::Device,
 ) -> Result<String> {
     use candle_core::Tensor;
 
@@ -100,7 +117,8 @@ fn generate_greedy(
     const EOS_TOKEN: u32 = 2;
 
     let prompt = format!("[INST] {question} [/INST]");
-    let enc    = tokenizer.encode(prompt, true)
+    let enc = tokenizer
+        .encode(prompt, true)
         .map_err(|e| MtpError::Other(format!("encode: {e}")))?;
     let prompt_ids: Vec<u32> = enc.get_ids().to_vec();
     let prompt_len = prompt_ids.len();
@@ -111,31 +129,42 @@ fn generate_greedy(
     let mut offset = 0usize;
 
     for _ in 0..MAX_NEW_TOKENS {
-        let logits = model.forward(&input, offset)
+        let logits = model
+            .forward(&input, offset)
             .map_err(|e| MtpError::Other(format!("forward: {e}")))?;
 
-        let last = logits.squeeze(0)
-            .and_then(|t| { let s = t.dim(0)?; t.get(s - 1) })
+        let last = logits
+            .squeeze(0)
+            .and_then(|t| {
+                let s = t.dim(0)?;
+                t.get(s - 1)
+            })
             .map_err(|e| MtpError::Other(format!("squeeze: {e}")))?;
 
-        let next_id = last.argmax(candle_core::D::Minus1)
+        let next_id = last
+            .argmax(candle_core::D::Minus1)
             .and_then(|t| t.to_scalar::<u32>())
             .map_err(|e| MtpError::Other(format!("argmax: {e}")))?;
 
         generated.push(next_id);
-        if next_id == EOS_TOKEN { break; }
+        if next_id == EOS_TOKEN {
+            break;
+        }
 
-        offset += input.dim(1).map_err(|e| MtpError::Other(format!("dim: {e}")))?;
-        input   = Tensor::from_vec(vec![next_id], (1, 1usize), device)
+        offset += input
+            .dim(1)
+            .map_err(|e| MtpError::Other(format!("dim: {e}")))?;
+        input = Tensor::from_vec(vec![next_id], (1, 1usize), device)
             .map_err(|e| MtpError::Other(format!("tensor next: {e}")))?;
     }
 
-    tokenizer.decode(&generated, true)
+    tokenizer
+        .decode(&generated, true)
         .map_err(|e| MtpError::Other(format!("decode: {e}")))
 }
 
 fn locate_hf_file(model_id: &str, filename: &str) -> Result<std::path::PathBuf> {
-    let home      = std::env::var("HOME").unwrap_or_else(|_| "/root".into());
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/root".into());
     let snapshots = std::path::PathBuf::from(format!(
         "{home}/.cache/huggingface/hub/models--{}/snapshots",
         model_id.replace('/', "--")
@@ -143,7 +172,9 @@ fn locate_hf_file(model_id: &str, filename: &str) -> Result<std::path::PathBuf> 
     if snapshots.exists() {
         for e in std::fs::read_dir(&snapshots)?.flatten() {
             let c = e.path().join(filename);
-            if c.exists() { return Ok(c); }
+            if c.exists() {
+                return Ok(c);
+            }
         }
     }
     Err(MtpError::AdapterNotFound(format!(
@@ -154,7 +185,7 @@ fn locate_hf_file(model_id: &str, filename: &str) -> Result<std::path::PathBuf> 
 }
 
 fn find_weight_files(model_id: &str) -> Result<Vec<std::path::PathBuf>> {
-    let home      = std::env::var("HOME").unwrap_or_else(|_| "/root".into());
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/root".into());
     let snapshots = std::path::PathBuf::from(format!(
         "{home}/.cache/huggingface/hub/models--{}/snapshots",
         model_id.replace('/', "--")
@@ -175,7 +206,8 @@ fn find_weight_files(model_id: &str) -> Result<Vec<std::path::PathBuf>> {
 
     if files.is_empty() {
         return Err(MtpError::AdapterNotFound(format!(
-            "Nenhum .safetensors para '{model_id}' em {}", snapshot_dir.display()
+            "Nenhum .safetensors para '{model_id}' em {}",
+            snapshot_dir.display()
         )));
     }
 

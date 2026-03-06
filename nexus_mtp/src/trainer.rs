@@ -11,23 +11,23 @@ use tracing::{error, info, warn};
 use crate::error::{MtpError, Result};
 
 pub struct TrainJob {
-    pub base_model:    String,
-    pub dataset_path:  PathBuf,
-    pub domain:        String,
-    pub epochs:        u32,
-    pub lora_r:        u32,
-    pub lora_alpha:    u32,
-    pub max_seq_len:   u32,
+    pub base_model: String,
+    pub dataset_path: PathBuf,
+    pub domain: String,
+    pub epochs: u32,
+    pub lora_r: u32,
+    pub lora_alpha: u32,
+    pub max_seq_len: u32,
     pub learning_rate: f64,
-    pub output_dir:    PathBuf,
-    pub adapter_path:  PathBuf,
-    pub models_dir:    PathBuf,
+    pub output_dir: PathBuf,
+    pub adapter_path: PathBuf,
+    pub models_dir: PathBuf,
 }
 
 pub struct TrainResult {
-    pub training_steps:   i32,
-    pub final_loss:       Option<f32>,
-    pub adapter_path:     PathBuf,
+    pub training_steps: i32,
+    pub final_loss: Option<f32>,
+    pub adapter_path: PathBuf,
     pub adapter_checksum: String,
 }
 
@@ -63,7 +63,7 @@ pub fn run_training(job: &TrainJob) -> Result<TrainResult> {
     });
 
     let mut training_complete = false;
-    let mut total_steps       = 0i32;
+    let mut total_steps = 0i32;
     let mut last_loss: Option<f32> = None;
 
     let reader = BufReader::new(stdout);
@@ -74,7 +74,9 @@ pub fn run_training(job: &TrainJob) -> Result<TrainResult> {
             continue;
         }
         if let Some(parsed) = parse_log_line(&line) {
-            if let Some(step) = parsed.step { total_steps = step; }
+            if let Some(step) = parsed.step {
+                total_steps = step;
+            }
             if let Some(loss) = parsed.loss {
                 last_loss = Some(loss);
                 info!("step={} loss={:.4}", total_steps, loss);
@@ -86,7 +88,7 @@ pub fn run_training(job: &TrainJob) -> Result<TrainResult> {
     let status = child.wait().map_err(|e| MtpError::Other(e.to_string()))?;
 
     if !status.success() || !training_complete {
-        let code   = status.code().unwrap_or(-1);
+        let code = status.code().unwrap_or(-1);
         let stderr = stderr_lines.join("\n");
         error!("Treinamento falhou (codigo {})", code);
         return Err(MtpError::TrainingFailed { code, stderr });
@@ -97,23 +99,23 @@ pub fn run_training(job: &TrainJob) -> Result<TrainResult> {
     let _ = fs::remove_file(&script_path);
 
     Ok(TrainResult {
-        training_steps:   total_steps,
-        final_loss:       last_loss,
-        adapter_path:     job.adapter_path.clone(),
+        training_steps: total_steps,
+        final_loss: last_loss,
+        adapter_path: job.adapter_path.clone(),
         adapter_checksum: checksum,
     })
 }
 
 fn build_python_script(job: &TrainJob) -> String {
-    let base_model   = sanitize_str(&job.base_model);
+    let base_model = sanitize_str(&job.base_model);
     let dataset_path = sanitize_str(&job.dataset_path.to_string_lossy());
     let adapter_path = sanitize_str(&job.adapter_path.to_string_lossy());
-    let output_dir   = sanitize_str(&job.output_dir.to_string_lossy());
-    let max_seq_len  = job.max_seq_len;
-    let lora_r       = job.lora_r;
-    let lora_alpha   = job.lora_alpha;
-    let epochs       = job.epochs;
-    let lr           = job.learning_rate;
+    let output_dir = sanitize_str(&job.output_dir.to_string_lossy());
+    let max_seq_len = job.max_seq_len;
+    let lora_r = job.lora_r;
+    let lora_alpha = job.lora_alpha;
+    let epochs = job.epochs;
+    let lr = job.learning_rate;
 
     format!(
         "#!/usr/bin/env python3\n\
@@ -196,7 +198,7 @@ pub fn compute_adapter_checksum(adapter_dir: &Path) -> Result<String> {
     let mut found_any = false;
     for entry in &entries {
         let path = entry.path();
-        let ext  = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
         if ext == "safetensors" || ext == "bin" {
             hasher.update(&fs::read(&path)?);
             found_any = true;
@@ -204,7 +206,10 @@ pub fn compute_adapter_checksum(adapter_dir: &Path) -> Result<String> {
     }
 
     if !found_any {
-        warn!("Nenhum .safetensors em {}; hash sobre nomes.", adapter_dir.display());
+        warn!(
+            "Nenhum .safetensors em {}; hash sobre nomes.",
+            adapter_dir.display()
+        );
         for entry in &entries {
             hasher.update(entry.file_name().to_string_lossy().as_bytes());
         }
@@ -213,11 +218,16 @@ pub fn compute_adapter_checksum(adapter_dir: &Path) -> Result<String> {
     Ok(hex::encode(hasher.finalize()))
 }
 
-struct LogEntry { step: Option<i32>, loss: Option<f32> }
+struct LogEntry {
+    step: Option<i32>,
+    loss: Option<f32>,
+}
 
 fn parse_log_line(line: &str) -> Option<LogEntry> {
     let trimmed = line.trim();
-    if !trimmed.starts_with('{') { return None; }
+    if !trimmed.starts_with('{') {
+        return None;
+    }
     let v: serde_json::Value = serde_json::from_str(trimmed).ok()?;
     Some(LogEntry {
         step: v.get("step").and_then(|s| s.as_i64()).map(|s| s as i32),

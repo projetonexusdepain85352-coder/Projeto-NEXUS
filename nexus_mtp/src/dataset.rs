@@ -15,21 +15,21 @@ use crate::{
     error::{MtpError, Result},
 };
 
-const CHUNK_WORDS:   usize = 1024;
+const CHUNK_WORDS: usize = 1024;
 const OVERLAP_WORDS: usize = 128;
 
 #[derive(Debug, Serialize)]
 pub struct AlpacaExample {
     pub instruction: String,
-    pub input:       String,
-    pub output:      String,
-    pub source:      String,
+    pub input: String,
+    pub output: String,
+    pub source: String,
 }
 
 pub async fn extract(
-    pool:         &PgPool,
-    domain:       &str,
-    max_samples:  i64,
+    pool: &PgPool,
+    domain: &str,
+    max_samples: i64,
     datasets_dir: &str,
 ) -> Result<(PathBuf, Vec<Uuid>, usize)> {
     validate_domain(domain)?;
@@ -41,7 +41,7 @@ pub async fn extract(
     info!("Encontrados {} documentos.", docs.len());
 
     let mut examples: Vec<AlpacaExample> = Vec::new();
-    let mut doc_ids:  Vec<Uuid>          = Vec::new();
+    let mut doc_ids: Vec<Uuid> = Vec::new();
 
     for doc in &docs {
         let chunks = chunk_text(&doc.content, CHUNK_WORDS, OVERLAP_WORDS);
@@ -52,9 +52,9 @@ pub async fn extract(
         for chunk in chunks {
             examples.push(AlpacaExample {
                 instruction: "Explique o seguinte conteudo tecnico:".to_string(),
-                input:       chunk,
-                output:      String::new(),
-                source:      doc.source.clone(),
+                input: chunk,
+                output: String::new(),
+                source: doc.source.clone(),
             });
         }
         doc_ids.push(doc.id);
@@ -63,11 +63,11 @@ pub async fn extract(
     let total_examples = examples.len();
     fs::create_dir_all(datasets_dir)?;
 
-    let ts       = Utc::now().format("%Y%m%d_%H%M%S");
+    let ts = Utc::now().format("%Y%m%d_%H%M%S");
     let filename = format!("{}_{}.jsonl", domain, ts);
-    let path     = PathBuf::from(datasets_dir).join(&filename);
+    let path = PathBuf::from(datasets_dir).join(&filename);
 
-    let file   = fs::File::create(&path)?;
+    let file = fs::File::create(&path)?;
     let mut bw = BufWriter::new(file);
     for ex in &examples {
         let line = serde_json::to_string(ex)?;
@@ -86,21 +86,34 @@ pub async fn extract(
         .join("\n");
     fs::write(&ids_path, ids_content)?;
 
-    info!("Dataset salvo: {} ({} docs, {} exemplos)", path.display(), doc_ids.len(), total_examples);
+    info!(
+        "Dataset salvo: {} ({} docs, {} exemplos)",
+        path.display(),
+        doc_ids.len(),
+        total_examples
+    );
     info!("IDs salvos em: {}", ids_path.display());
     Ok((path, doc_ids, total_examples))
 }
 
 pub fn chunk_text(text: &str, chunk_words: usize, overlap_words: usize) -> Vec<String> {
     let words: Vec<&str> = text.split_whitespace().collect();
-    if words.is_empty() { return Vec::new(); }
-    let step = if chunk_words > overlap_words { chunk_words - overlap_words } else { chunk_words };
+    if words.is_empty() {
+        return Vec::new();
+    }
+    let step = if chunk_words > overlap_words {
+        chunk_words - overlap_words
+    } else {
+        chunk_words
+    };
     let mut chunks = Vec::new();
-    let mut start  = 0usize;
+    let mut start = 0usize;
     while start < words.len() {
         let end = (start + chunk_words).min(words.len());
         chunks.push(words[start..end].join(" "));
-        if end == words.len() { break; }
+        if end == words.len() {
+            break;
+        }
         start += step;
     }
     chunks

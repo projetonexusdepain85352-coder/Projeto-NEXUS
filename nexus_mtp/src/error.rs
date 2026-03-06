@@ -6,24 +6,26 @@ pub enum MtpError {
     Database(#[from] sqlx::Error),
     #[error("Erro de IO: {0}")]
     Io(#[from] std::io::Error),
-    #[error("Erro de serialização JSON: {0}")]
+    #[error("Erro de serializacao JSON: {0}")]
     Json(#[from] serde_json::Error),
-    #[error("Modelo não encontrado: {0}")]
+    #[error("Modelo nao encontrado: {0}")]
     ModelNotFound(String),
-    #[error("Domínio inválido: '{0}'. Use: rust | infra | security | mlops")]
+    #[error("Dominio invalido: '{0}'. Use: rust | infra | security | mlops")]
     InvalidDomain(String),
-    #[error("Nenhum documento aprovado encontrado para domínio '{0}'")]
+    #[error("Nenhum documento aprovado encontrado para dominio '{0}'")]
     NoDocuments(String),
-    #[error("Treinamento falhou com código {code}: {stderr}")]
+    #[error("Treinamento falhou com codigo {code}: {stderr}")]
     TrainingFailed { code: i32, stderr: String },
     #[error("Modelo precisa ter status 'approved' para deploy. Status atual: '{0}'")]
     NotApproved(String),
-    #[error("Adapter não encontrado em: {0}")]
+    #[error("Adapter nao encontrado em: {0}")]
     AdapterNotFound(String),
-    #[error("Erro de variável de ambiente: {0}")]
+    #[error("Erro de variavel de ambiente: {0}")]
     EnvVar(#[from] std::env::VarError),
     #[error("Erro de UUID: {0}")]
     Uuid(#[from] uuid::Error),
+    #[error("Gate da Etapa A nao satisfeito: {0}")]
+    StageAGateNotSatisfied(String),
     #[error("{0}")]
     Other(String),
 }
