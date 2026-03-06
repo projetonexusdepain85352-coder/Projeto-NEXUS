@@ -1,0 +1,82 @@
+[
+    {
+        "Architecture": "amd64",
+        "Config": {
+            "Cmd": [
+                "postgres"
+            ],
+            "Entrypoint": [
+                "docker-entrypoint.sh"
+            ],
+            "Env": [
+                "POSTGRES_USER=kb_admin",
+                "POSTGRES_PASSWORD=KbAdmin2026seCCKDS88448cure",
+                "POSTGRES_DB=knowledge_base",
+                "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/lib/postgresql/17/bin",
+                "GOSU_VERSION=1.19",
+                "LANG=en_US.utf8",
+                "PG_MAJOR=17",
+                "PG_VERSION=17.8-1.pgdg13+1",
+                "PGDATA=/var/lib/postgresql/data"
+            ],
+            "ExposedPorts": {
+                "5432/tcp": {}
+            },
+            "Labels": {
+                "desktop.docker.io/binds/0/Source": "/home/dulan/projeto/dados/postgres",
+                "desktop.docker.io/binds/0/SourceKind": "wsl2DistroFile",
+                "desktop.docker.io/binds/0/Target": "/var/lib/postgresql/data",
+                "desktop.docker.io/ports.scheme": "v2",
+                "desktop.docker.io/ports/5432/tcp": ":5432",
+                "desktop.docker.io/wsl-distro": "Ubuntu"
+            },
+            "StopSignal": "SIGINT",
+            "Volumes": {
+                "/var/lib/postgresql/data": {}
+            }
+        },
+        "Created": "2026-03-02T15:01:14.609845061Z",
+        "Descriptor": {
+            "annotations": {
+                "io.containerd.image.name": "docker.io/library/meu_postgres_com_dados:latest",
+                "org.opencontainers.image.ref.name": "latest"
+            },
+            "digest": "sha256:b4bcede90cedf04b0328071d11f87c630ac39f59172062a58fd84aec3f6b9c99",
+            "mediaType": "application/vnd.oci.image.manifest.v1+json",
+            "size": 3561
+        },
+        "Id": "sha256:b4bcede90cedf04b0328071d11f87c630ac39f59172062a58fd84aec3f6b9c99",
+        "Metadata": {
+            "LastTagTime": "2026-03-03T00:15:06.068306386Z"
+        },
+        "Os": "linux",
+        "Parent": "sha256:9ba47fa6d1c34e9cc4c1758640e7774a9b73ea0fba891f14088321ba7561d253",
+        "RepoDigests": [
+            "meu_postgres_com_dados@sha256:b4bcede90cedf04b0328071d11f87c630ac39f59172062a58fd84aec3f6b9c99"
+        ],
+        "RepoTags": [
+            "meu_postgres_com_dados:latest"
+        ],
+        "RootFS": {
+            "Layers": [
+                "sha256:a257f20c716c7b5d0474b1b5998f4d1090b573d90b82f764b8f1f1faeb4b524f",
+                "sha256:7fbf8dc85ca75b6074a9a324124a9587820840c20be99a64feac4970d1380495",
+                "sha256:b0818beddec70aa926dc3505b75fe9bd634fea31f4d6b200f1dfb9bb1f83ce89",
+                "sha256:5e180cc1af65ee64f118b76c72357137acc1fbb44b8c7c5a7ea4ee94b66ca872",
+                "sha256:739dde783a1782be5bd4de97f48440be363667a558139dc55cafcf6552c52ef1",
+                "sha256:30493c484310fe2607b475a756d4ed4b8f7d1eb8a4328ef9486c7eadc126b97c",
+                "sha256:8eca11b2ee86763fe3139120971bda5e7f38dbe6bd847c20a3699c1d93a981a4",
+                "sha256:38d49d742c75b6321a9c50612e238dcb6a413b161bd6ea4810825b1205204a42",
+                "sha256:7f0dfab50c40a0360832528fa5890492ebe147149468910c41ac45f8cade94d3",
+                "sha256:7a9e940fb16372afeda0cb15906add22f6d652439ef09309bb1be637910d16c7",
+                "sha256:9ab23b35dcd826df253954b7581986b4948a46b11f933f71d4d7c6c8c2456ce2",
+                "sha256:5eda815919b85acd20312128fc31c531355434fc52711d474ca882802e3a3f2f",
+                "sha256:900a792e86b4ee76c27aa55f55cdd7bb36ea27cce7c1092905a3903f4b2c38bc",
+                "sha256:821ec3565c004109b093cb797d84371f5cf5dbb917f6055ff8576aede8f8eed4",
+                "sha256:768b6a14bba712653a33aec5461eaf256eadaeb3ae16e2595c0f1eb526ab273b"
+            ],
+            "Type": "layers"
+        },
+        "Size": 224603964
+    }
+]
