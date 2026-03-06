@@ -7,10 +7,23 @@
 ## Estado Atual (atualizado em 06/03/2026)
 
 - Fase: `Fase 0 / Etapa A` (popular base imutavel)
-- Progresso estimado: `~60%`
-- Base de conhecimento (ultima contagem registrada): `1.408 documentos`
-- Validacao: `5 approved`, `1 rejected`, restante `pending`
+- Progresso estimado: `~68%`
+- Base de conhecimento (pg_copia): `1.408 documentos`
+- Validacao (pg_copia): `1.268 approved`, `14 rejected`, `126 pending`
 - Modelo especializado em producao: `ainda nao`
+
+### Ultima execucao em copias (06/03/2026)
+
+- Containers usados:
+  - `pg_copia` (`5433`)
+  - `qdrant_copia` (`6335/6336`)
+- `nexus_rag status` antes do index: `1268 approved / 0 indexed`
+- `nexus_rag index` concluido: `1258 indexed`, `10 erros` (dominio `security`)
+- `nexus_rag status` depois do index:
+  - `infra`: `709/709`
+  - `rust`: `384/384`
+  - `mlops`: `118/118`
+  - `security`: `47/57` (`delta 10`)
 
 ## Visao Resumida do Projeto
 
@@ -57,12 +70,13 @@ NEXUS e dividido em componentes independentes, com isolamento e trilha de audito
 
 - Aprovacao/rejeicao manual com sessao persistente.
 - Heuristica local para sugestao (sem depender de API externa).
-- Fluxo atual ainda e o principal gargalo operacional.
+- Fluxo ainda e gargalo operacional principal.
 
 ### 4) Nexus RAG (Rust + Qdrant)
 
 - Embeddings: `all-MiniLM-L6-v2` (dim=384).
 - Comandos: `index`, `query`, `status`.
+- Limpeza de conteudo integrada antes de chunking para remover cabecalhos/TOC/lixo de navegacao.
 - Politica ativa: modo estrito de grounding por evidencia validada.
 
 ### 5) Nexus MTP (Rust + Python/unsloth)
@@ -71,7 +85,7 @@ NEXUS e dividido em componentes independentes, com isolamento e trilha de audito
 - Base model planejado para ciclos iniciais: familia Mistral 7B (QLoRA 4-bit).
 - Sem deploy de modelo ainda (dependente de massa critica validada).
 
-### 6) Servidor de Controle Web (novo)
+### 6) Servidor de Controle Web
 
 - Pasta: `nexus_control_server/`
 - Painel para gerenciar servicos via navegador (Google Chrome).
@@ -89,45 +103,73 @@ O agente deve responder somente com base em evidencia validada no banco.
 
 Referencia: `NEXUS_GROUNDING_POLICY.md`.
 
-## Operacao Diaria (resumo)
+## Operacao em Copias (padrao atual)
 
-1. Subir infraestrutura de dados (`PostgreSQL` e `Qdrant`).
-2. Rodar coleta no Agente Intermediario.
-3. Validar lote pendente no Validador TUI.
-4. Indexar aprovados no RAG.
-5. Rodar ciclo do MTP para dominio com massa critica.
-6. Aprovar manualmente antes de qualquer deploy.
+1. Subir `pg_copia` e `qdrant_copia`.
+2. Carregar ambiente:
+
+```bash
+source scripts/run_copy_env.sh
+```
+
+3. Validar permissao de leitura e corrigir grants quando necessario:
+
+```bash
+source scripts/ensure_permissions.sh
+nexus_pg_check_reader || nexus_pg_reapply_reader_grants
+```
+
+4. Rodar RAG:
+
+```bash
+cd nexus_rag
+cargo run --release -- status
+cargo run --release -- index
+```
+
+## Resiliencia de Permissoes (novo)
+
+Mudancas aplicadas para evitar o erro `Falha ao conectar ao banco de dados: db error` no validador:
+
+- `nexus_rag/src/indexer.rs`
+  - no final do `run_index`, tenta reaplicar:
+    - `GRANT USAGE ON SCHEMA public TO kb_reader`
+    - `GRANT SELECT ON ALL TABLES IN SCHEMA public TO kb_reader`
+    - `ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO kb_reader`
+- `scripts/ensure_permissions.sh`
+  - funcao `nexus_pg_check_reader` (`SELECT 1` com `kb_reader`)
+  - funcao `nexus_pg_reapply_reader_grants` (tenta `kb_ingest`, fallback `kb_admin` se disponivel)
+- `iniciar_validador.sh`
+  - executa health-check de `kb_reader` antes de abrir TUI
+  - tenta autocorrecao de grants se falhar
+  - so continua se conexao ficar OK
+  - fallback de execucao do validador: binario precompilado ou `cargo run --release`
 
 ## Seguranca e Segredos
 
 - Nao versionar segredos em README, codigo ou commits.
 - Usar variaveis de ambiente para senhas/tokens/chaves.
-- Recomenda-se rotacionar credenciais ja expostas em historico/local.
+- Rotacionar credenciais ja expostas em historico/local.
 
 ## Limitacoes e Gargalos Atuais
 
 | Item | Impacto | Mitigacao sugerida |
 | --- | --- | --- |
-| Baixo volume de documentos aprovados | Bloqueia treino util e deploy do 1o modelo | Mutirao de validacao por dominio prioritario com metas diarias (ex.: 80-120 docs/dia) |
-| Validacao manual e lenta | Crescimento da base nao acompanha coleta | Priorizar fila por score/criticidade e ativar triagem semiautomatica com revisao humana |
-| Ambiente Windows + WSL para producao | Maior risco operacional e performance inconsistente | Migrar runtime critico para Linux nativo (host principal) |
-| Credenciais ja circularam em texto | Risco de seguranca operacional | Rotacionar senhas/tokens e centralizar em `.env` local nao versionado + cofre de segredos |
-| Ausencia de modelo em producao | Nucleo ainda sem resposta especializada propria | Fechar criterio de parada da Etapa A e executar primeiro ciclo completo do MTP |
-| Qdrant com pouca/nenhuma colecao util | RAG sem ganho pratico em producao | Indexar imediatamente apos aprovacoes por dominio e monitorar cobertura por colecao |
+| `10` aprovados de `security` nao indexados | Cobertura incompleta no RAG para seguranca | Rodar `nexus_rag index` com log focado nesses docs, identificar causa (conteudo vazio pos-limpeza, payload, ou erro de embed) e corrigir regra no `clean.rs` |
+| Validacao manual ainda pendente (`126 pending`) | Atrasa treino especializado completo | Fechar pendencias por lote e por dominio prioritario com meta diaria objetiva |
+| Dependencia de WSL gateway dinamico | Pode quebrar conexao apos reboot | `run_copy_env.sh` ja prioriza `host.docker.internal` e faz fallback automatico para gateway atual |
+| Permissao de `kb_reader` pode derivar de grants incompletos em ambientes divergentes | Quebra do validador na abertura | Health-check + autocorrecao ja implementados; manter `ensure_permissions.sh` no bootstrap operacional |
+| Ausencia de modelo em producao | Nucleo ainda sem resposta especializada propria | Fechar Etapa A e executar primeiro ciclo completo do MTP |
 | Watchdog/RTS/IO/DRO ainda nao implantados | Governanca e resiliencia incompletas | Entrega faseada: Watchdog minimo -> RTS minimo -> DR minimo -> IO |
-| Acesso remoto em fase inicial | Superficie de ataque pode aumentar | Expor apenas via tunel HTTPS + allowlist Google + token forte + sem porta aberta no roteador |
 
 ## Proximos Passos Prioritarios
 
-1. Fechar validacao manual pendente para atingir massa critica por dominio.
-2. Indexar aprovados e validar qualidade de recuperacao no RAG.
-3. Executar primeiro ciclo completo MTP (`extract/train/benchmark/approve/deploy`).
-4. Implantar watchdog minimo com criterios mensuraveis e alerta.
-5. Migrar componentes criticos para Linux host e formalizar baseline de observabilidade.
+1. Fechar os `126 pending` restantes.
+2. Corrigir os `10` `security` aprovados que ainda nao indexaram.
+3. Executar `nexus_mtp extract` com dados ja limpos para o dominio priorizado.
+4. Rodar primeiro ciclo `train -> benchmark -> approve -> deploy`.
+5. Consolidar runbook Linux nativo para reduzir fragilidade operacional em WSL.
 
----
-
-Se quiser, no proximo passo eu tambem gero uma versao `README_OPERACAO.md` (runbook objetivo, so comandos e troubleshooting) e uma `README_ARQUITETURA.md` (visao tecnica detalhada por componente).
 ## Backup Policy (obrigatorio)
 
 Para cada alteracao relevante de codigo, gerar backup em duas camadas:

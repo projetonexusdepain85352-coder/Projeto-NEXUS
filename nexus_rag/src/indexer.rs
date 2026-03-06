@@ -230,6 +230,20 @@ struct DomainStats {
     skipped: usize,
     errors: usize,
 }
+async fn reapply_kb_reader_grants(pool: &PgPool) -> Result<()> {
+    const GRANTS: [&str; 3] = [
+        "GRANT USAGE ON SCHEMA public TO kb_reader",
+        "GRANT SELECT ON ALL TABLES IN SCHEMA public TO kb_reader",
+        "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO kb_reader",
+    ];
+
+    for statement in GRANTS {
+        sqlx::query(statement).execute(pool).await?;
+    }
+
+    tracing::info!("Reapplied kb_reader grants after indexing");
+    Ok(())
+}
 
 // ── Public entry-point ───────────────────────────────────────────────────────
 
@@ -293,7 +307,12 @@ pub async fn run_index(pool: &PgPool) -> Result<()> {
     println!("╠══════════════════════════════════════════╬═════╬═══════╬═════╣");
     println!("║ {:<40} ║ {:>3} ║ {:>5} ║ {:>3} ║", "TOTAL", ti, ts, te);
     println!("╚══════════════════════════════════════════╩═════╩═══════╩═════╝");
-
+    if let Err(e) = reapply_kb_reader_grants(pool).await {
+        tracing::warn!(
+            error = %e,
+            "Could not reapply kb_reader grants after indexing"
+        );
+    }
     if te > 0 {
         tracing::warn!(errors = te, "Index run completed with errors");
     } else {
