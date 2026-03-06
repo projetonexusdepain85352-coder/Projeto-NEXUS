@@ -18,6 +18,13 @@ function Save-Text([string]$Path, [string]$Content) {
     [System.IO.File]::WriteAllText($Path, $Content, $enc)
 }
 
+function Run-External([scriptblock]$Command, [string]$ErrorMessage) {
+    & $Command
+    if ($LASTEXITCODE -ne 0) {
+        throw $ErrorMessage
+    }
+}
+
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $branch = (& git -C $repoRoot branch --show-current).Trim()
@@ -27,13 +34,17 @@ Ensure-Dir $outDir
 
 Write-Info "Collecting container metadata from $ContainerName"
 $inspect = (& docker inspect $ContainerName) -join [Environment]::NewLine
+if ($LASTEXITCODE -ne 0) { throw "docker inspect failed" }
 Save-Text (Join-Path $outDir "container_inspect.json") $inspect
 
 $imageName = (& docker inspect -f "{{.Config.Image}}" $ContainerName).Trim()
+if ($LASTEXITCODE -ne 0) { throw "docker inspect image failed" }
 $imageInspect = (& docker image inspect $imageName) -join [Environment]::NewLine
+if ($LASTEXITCODE -ne 0) { throw "docker image inspect failed" }
 Save-Text (Join-Path $outDir "image_inspect.json") $imageInspect
 
 $envDump = (& docker inspect -f "{{range .Config.Env}}{{println .}}{{end}}" $ContainerName) -join [Environment]::NewLine
+if ($LASTEXITCODE -ne 0) { throw "docker inspect env failed" }
 Save-Text (Join-Path $outDir "container_env.txt") $envDump
 
 Write-Info "Dumping PostgreSQL database"
@@ -45,19 +56,19 @@ $dumpCmd = 'PGPASSWORD="$POSTGRES_PASSWORD" pg_dump -U "$POSTGRES_USER" -d "$POS
 $schemaCmd = 'PGPASSWORD="$POSTGRES_PASSWORD" pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -s -f "' + $tmpSchema + '"'
 $statsCmd = 'PGPASSWORD="$POSTGRES_PASSWORD" psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c ''SELECT status, COUNT(*) FROM validation GROUP BY status ORDER BY status;'' > "' + $tmpStats + '"'
 
-& docker exec $ContainerName sh -lc $dumpCmd
-& docker exec $ContainerName sh -lc $schemaCmd
-& docker exec $ContainerName sh -lc $statsCmd
+Run-External { docker exec $ContainerName sh -lc $dumpCmd } "pg_dump full failed"
+Run-External { docker exec $ContainerName sh -lc $schemaCmd } "pg_dump schema failed"
+Run-External { docker exec $ContainerName sh -lc $statsCmd } "psql stats export failed"
 
 $dumpPath = Join-Path $outDir "knowledge_base.dump"
 $schemaPath = Join-Path $outDir "knowledge_base_schema.sql"
 $statsPath = Join-Path $outDir "validation_stats.txt"
 
-& docker cp "${ContainerName}:$tmpDump" $dumpPath
-& docker cp "${ContainerName}:$tmpSchema" $schemaPath
-& docker cp "${ContainerName}:$tmpStats" $statsPath
+Run-External { docker cp "${ContainerName}:$tmpDump" $dumpPath } "docker cp dump failed"
+Run-External { docker cp "${ContainerName}:$tmpSchema" $schemaPath } "docker cp schema failed"
+Run-External { docker cp "${ContainerName}:$tmpStats" $statsPath } "docker cp stats failed"
 
-& docker exec $ContainerName sh -lc "rm -f $tmpDump $tmpSchema $tmpStats"
+Run-External { docker exec $ContainerName sh -lc "rm -f $tmpDump $tmpSchema $tmpStats" } "cleanup temp dump files failed"
 
 $dumpHash = (Get-FileHash -Algorithm SHA256 -Path $dumpPath).Hash
 $schemaHash = (Get-FileHash -Algorithm SHA256 -Path $schemaPath).Hash
@@ -82,16 +93,16 @@ Write-Info "Container sync snapshot generated: github_backups/container_sync/$ti
 
 Push-Location $repoRoot
 try {
-    & git add "github_backups/container_sync/$timestamp"
-    & git add "scripts/sync_container_to_github.ps1"
+    Run-External { git add "github_backups/container_sync/$timestamp" } "git add snapshot failed"
+    Run-External { git add "scripts/sync_container_to_github.ps1" } "git add script failed"
 
     & git diff --cached --quiet
     if ($LASTEXITCODE -ne 0) {
-        & git commit -m "backup(container): sync $ContainerName at $timestamp"
+        Run-External { git commit -m "backup(container): sync $ContainerName at $timestamp" } "git commit failed"
         Write-Info "Commit created on branch $branch"
 
         if ($Push) {
-            & git push origin $branch
+            Run-External { git push origin $branch } "git push failed. Check remote URL and credentials."
             Write-Info "Pushed to origin/$branch"
         }
     }
