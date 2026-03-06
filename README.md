@@ -128,3 +128,21 @@ Referencia: `NEXUS_GROUNDING_POLICY.md`.
 ---
 
 Se quiser, no proximo passo eu tambem gero uma versao `README_OPERACAO.md` (runbook objetivo, so comandos e troubleshooting) e uma `README_ARQUITETURA.md` (visao tecnica detalhada por componente).
+## Backup Policy (obrigatorio)
+
+Para cada alteracao relevante de codigo, gerar backup em duas camadas:
+
+1. Local + container Docker (`/var/backups/nexus_code`)
+2. Snapshot para versionamento no GitHub (`github_backups/`)
+
+Script padrao:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/backup_snapshot.ps1 -Label "nome_da_mudanca" -CommitGithubBackup -PushGithubBackup
+```
+
+Sem push:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/backup_snapshot.ps1 -Label "nome_da_mudanca"
+```
