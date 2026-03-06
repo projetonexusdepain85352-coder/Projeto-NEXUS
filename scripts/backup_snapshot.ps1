@@ -109,7 +109,7 @@ if (-not $SkipContainerCopy) {
     try {
         & docker exec $ContainerName sh -lc "mkdir -p /var/backups/nexus_code" | Out-Null
         & docker cp $archivePath "${ContainerName}:/var/backups/nexus_code/$archiveName"
-        Write-Info "Archive copied to container: $ContainerName:/var/backups/nexus_code/$archiveName"
+        Write-Info "Archive copied to container: ${ContainerName}:/var/backups/nexus_code/$archiveName"
     }
     catch {
         Write-Warning "Container copy failed: $($_.Exception.Message)"
