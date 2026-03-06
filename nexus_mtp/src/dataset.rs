@@ -10,6 +10,7 @@ use sqlx::PgPool;
 use tracing::{info, warn};
 use uuid::Uuid;
 
+use crate::clean::clean_document_text;
 use crate::{
     db::{fetch_approved_documents, mark_training_eligible},
     error::{MtpError, Result},
@@ -44,7 +45,8 @@ pub async fn extract(
     let mut doc_ids: Vec<Uuid> = Vec::new();
 
     for doc in &docs {
-        let chunks = chunk_text(&doc.content, CHUNK_WORDS, OVERLAP_WORDS);
+        let cleaned = clean_document_text(&doc.content);
+        let chunks = chunk_text(&cleaned, CHUNK_WORDS, OVERLAP_WORDS);
         if chunks.is_empty() {
             warn!("Documento {} vazio apos chunking, ignorando.", doc.id);
             continue;

@@ -1,4 +1,5 @@
 mod approval;
+mod clean;
 mod db;
 mod embedder;
 mod error;

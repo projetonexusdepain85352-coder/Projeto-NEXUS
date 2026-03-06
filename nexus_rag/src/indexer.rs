@@ -11,6 +11,7 @@ use qdrant_client::qdrant::{
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use crate::clean::clean_document_text;
 use crate::db::{DocumentRecord, fetch_approved_documents};
 use crate::embedder::{EMBEDDING_DIM, Embedder};
 use crate::error::{NexusError, Result, qdrant_err};
@@ -158,7 +159,8 @@ async fn index_document(
     embedder: &Embedder,
     doc: &DocumentRecord,
 ) -> Result<IndexOutcome> {
-    if doc.content.trim().is_empty() {
+    let cleaned_content = clean_document_text(&doc.content);
+    if cleaned_content.trim().is_empty() {
         return Err(NexusError::Config(format!(
             "Document {} has empty content",
             doc.id
@@ -170,7 +172,7 @@ async fn index_document(
     }
     ensure_collection(client, &coll).await?;
 
-    let chunks = chunk_text(&doc.content, WORDS_PER_CHUNK, OVERLAP_WORDS);
+    let chunks = chunk_text(&cleaned_content, WORDS_PER_CHUNK, OVERLAP_WORDS);
     let chunk_total = chunks.len();
     if chunk_total == 0 {
         return Err(NexusError::Config(format!(
