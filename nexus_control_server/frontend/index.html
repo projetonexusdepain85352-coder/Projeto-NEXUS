@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS — Control Server</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<link rel="stylesheet" href="/frontend/styles.css">
+</head>
+<body>
+
+<div class="grid-bg"></div>
+
+<div id="login-screen">
+  <div class="login-wrap">
+    <div class="login-wrap-glow"></div>
+    <div class="corner-br"></div>
+    <div class="corner-bl"></div>
+    <div class="login-sys-tag">Sistema de controle remoto · <span>NEXUS-OS</span></div>
+    <div class="login-logo">NEXUS</div>
+    <div class="login-subtitle">Control Server · v1.0</div>
+    <hr class="login-divider">
+    <div class="google-btn-wrap">
+      <div class="google-btn-label">— AUTENTICAR COM GOOGLE —</div>
+      <div id="google-btn-real"></div>
+    </div>
+    <div id="login-status"><span class="status-blink" id="login-cursor" style="display:none">█</span><span id="login-msg"></span></div>
+    <div class="login-footer">ACESSO RESTRITO · SOMENTE CONTAS AUTORIZADAS</div>
+  </div>
+</div>
+
+<div id="dashboard">
+  <nav>
+    <div class="nav-inner">
+      <div class="nav-logo">
+        NEXUS
+        <span>Control Server</span>
+      </div>
+      <div class="nav-user">
+        <div class="nav-user-dot"></div>
+        Sessão ativa · <em id="nav-email">—</em>
+      </div>
+      <button class="nav-logout" onclick="logout()">[ sair ]</button>
+    </div>
+  </nav>
+
+  <main>
+    <div class="section-label">// 01</div>
+    <h2>Serviços</h2>
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-dot pd-red"></div>
+        <div class="panel-dot pd-amber"></div>
+        <div class="panel-dot pd-green"></div>
+        <span style="margin-left:8px;">nexus — processos gerenciados</span>
+        <button class="btn-refresh" style="margin-left:auto" onclick="refreshServices()">↺ Atualizar</button>
+      </div>
+      <div class="panel-body">
+        <table class="svc-table">
+          <thead>
+            <tr>
+              <th>Serviço</th><th>Status</th><th>PID</th><th>Comando</th><th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="svc-tbody">
+            <tr><td colspan="5"><div class="empty-state"><div class="icon">⟳</div>Carregando...</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section-label">// 02</div>
+    <h2>Logs</h2>
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-dot pd-red"></div>
+        <div class="panel-dot pd-amber"></div>
+        <div class="panel-dot pd-green"></div>
+        <span style="margin-left:8px;">stdout — stream de saída</span>
+      </div>
+      <div class="panel-body">
+        <div class="logs-controls">
+          <select id="logs-service" class="logs-select"></select>
+          <input id="logs-lines" type="number" min="1" max="1000" value="200" class="logs-lines" style="width:90px">
+          <button class="btn-load-logs" onclick="loadLogs()">▶ Carregar</button>
+        </div>
+        <div class="logs-output" id="logs-output">(sem logs)</div>
+      </div>
+    </div>
+
+    <div class="status-bar">
+      <div class="status-bar-item"><div class="dot"></div>Worker: nexus-control.projeton-e-x-u-sdepain85352.workers.dev</div>
+      <div class="status-bar-item"><div class="dot"></div>Porta local: 8787</div>
+      <div class="status-bar-time" id="status-time">—</div>
+    </div>
+  </main>
+</div>
+
+<div id="toast"></div>
+
+
+  <script src="/frontend/app.js" defer></script>
+</body>
+</html>
