@@ -6,3 +6,9 @@ models/
 **/target/
 nexus_control_server/.state.json
 nexus_control_server/__pycache__/
+nexus_rag/.fastembed_cache/
+nexus_sugestor/*.log
+nexus_control_server/*.log
+nexus_control_server/.env.worker
+nexus_control_server/.nexus_start.pid
+nexus_control_server/bin/
