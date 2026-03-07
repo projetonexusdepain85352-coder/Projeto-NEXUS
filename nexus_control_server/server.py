@@ -533,19 +533,35 @@ async function fetchAuthConfig() {
   } catch { googleCfg = { google_enabled: false, google_client_id: null }; }
 }
 
+let googleSetupAttempts = 0;
+
 function setupGoogleButton() {
-  if (!window.google || !google.accounts || !googleCfg.google_client_id) {
+  googleSetupAttempts += 1;
+
+  if (!googleCfg.google_client_id) {
+    loginStatus('Google auth nao configurado no backend.', false);
+    return;
+  }
+
+  if (!window.google || !google.accounts || !google.accounts.id) {
+    if (googleSetupAttempts > 20) {
+      loginStatus('SDK Google nao carregou. Verifique bloqueio de extensao/CSP.', false);
+      return;
+    }
     setTimeout(setupGoogleButton, 500);
     return;
   }
+
   google.accounts.id.initialize({
     client_id: googleCfg.google_client_id,
     callback: onGoogleCredential,
     auto_select: false,
     ux_mode: 'popup'
   });
+
   const container = document.getElementById('google-btn-real');
   container.innerHTML = '';
+
   google.accounts.id.renderButton(container, {
     theme: 'filled_black',
     size: 'large',
@@ -553,6 +569,7 @@ function setupGoogleButton() {
     text: 'signin_with',
     shape: 'rectangular'
   });
+
   loginStatus('Pronto. Clique em autenticar.', false);
 }
 
@@ -1088,7 +1105,7 @@ def _send_security_headers(handler: BaseHTTPRequestHandler, is_html: bool = Fals
     handler.send_header("X-Frame-Options", "DENY")
     handler.send_header("Referrer-Policy", "no-referrer")
     handler.send_header("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
-    handler.send_header("Cross-Origin-Opener-Policy", "same-origin")
+    handler.send_header("Cross-Origin-Opener-Policy", "same-origin-allow-popups")
     handler.send_header("Cross-Origin-Resource-Policy", "same-origin")
     handler.send_header("Cache-Control", "no-store")
     handler.send_header("Pragma", "no-cache")
@@ -1097,9 +1114,9 @@ def _send_security_headers(handler: BaseHTTPRequestHandler, is_html: bool = Fals
         csp = (
             "default-src 'self'; "
             "script-src 'self' https://accounts.google.com 'unsafe-inline'; "
-            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com; "
             "font-src 'self' https://fonts.gstatic.com data:; "
-            "connect-src 'self' https://oauth2.googleapis.com; "
+            "connect-src 'self' https://oauth2.googleapis.com https://accounts.google.com; "
             "frame-src https://accounts.google.com; "
             "img-src 'self' data:; "
             "base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
