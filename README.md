@@ -142,7 +142,7 @@ source scripts/ensure_permissions.sh
 nexus_pg_check_reader
 ```
 
-### 2.2 Auto-correção de grants
+### 2.2 Auto-correÃ§Ã£o de grants
 
 ```bash
 nexus_pg_reapply_reader_grants
@@ -468,7 +468,7 @@ Com parametros de override disponiveis (`--min-security`, `--min-rust`, `--min-i
 
 ## 7.1 Objetivo
 
-Gerenciar servicos do NEXUS pelo navegador (incluindo Google Chrome), com autenticacao por token e opcionalmente Google.
+Gerenciar servicos do NEXUS pelo navegador (incluindo Google Chrome), com autenticacao por Google OAuth e sessao assinada no backend.
 
 ## 7.2 Defaults reais
 
@@ -478,9 +478,9 @@ Gerenciar servicos do NEXUS pelo navegador (incluindo Google Chrome), com autent
 
 ## 7.3 Variaveis de autenticacao
 
-- `NEXUS_CONTROL_TOKEN`
 - `NEXUS_GOOGLE_CLIENT_ID`
 - `NEXUS_GOOGLE_ALLOWED_EMAILS`
+- `NEXUS_CONTROL_TOKEN` (legado em scripts, nao e usado para autorizar API no backend atual)
 
 ## 7.4 Subir local
 
@@ -491,7 +491,14 @@ python nexus_control_server/server.py
 Painel local:
 - `http://localhost:8787`
 
-## 7.5 Endpoints API
+## 7.5 Comportamento real de autenticacao
+
+- `POST /api/auth/google` valida `id_token` no Google e cria sessao local temporaria.
+- Endpoints protegidos exigem token de sessao valida (Authorization Bearer ou `?token=`).
+- Sem Google configurado (`NEXUS_GOOGLE_CLIENT_ID` vazio), o backend responde `503` em endpoints protegidos.
+- O backend atual nao aceita mais token estatico como metodo primario de login.
+
+## 7.6 Endpoints API
 
 - `GET /api/health`
 - `GET /api/auth/config`
@@ -501,9 +508,11 @@ Painel local:
 - `POST /api/services/<name>/stop`
 - `GET /api/logs/<name>?lines=200`
 
-## 7.6 Exposicao externa (Cloudflare Tunnel)
+## 7.7 Exposicao externa (Cloudflare Tunnel + Worker fixo)
 
 Scripts disponiveis:
+- `nexus_control_server/scripts/setup_worker.sh` (setup inicial da URL fixa no Cloudflare Worker)
+- `nexus_control_server/scripts/nexus_start.sh` (start servidor + tunnel + update de target no Worker)
 - `nexus_control_server/scripts/start_quick_tunnel_wsl.sh`
 - `nexus_control_server/scripts/setup_named_tunnel_wsl.sh`
 - `nexus_control_server/scripts/start_named_tunnel_wsl.sh`
@@ -511,6 +520,7 @@ Scripts disponiveis:
 Regra:
 - nao abrir porta 8787 no roteador
 - publicar via tunnel HTTPS
+- preferir URL fixa `workers.dev` como entrada publica; tunnel quick fica como origem dinamica
 
 ---
 
@@ -587,10 +597,10 @@ Projeto-NEXUS/
 +-- NEXUS_GROUNDING_POLICY.md
 +-- iniciar_validador.sh
 +-- scripts/
-¦   +-- run_copy_env.sh
-¦   +-- ensure_permissions.sh
-¦   +-- backup_snapshot.ps1
-¦   +-- sync_container_to_github.ps1
+Â¦   +-- run_copy_env.sh
+Â¦   +-- ensure_permissions.sh
+Â¦   +-- backup_snapshot.ps1
+Â¦   +-- sync_container_to_github.ps1
 +-- agente_intermediario/
 +-- validador/
 +-- nexus_rag/

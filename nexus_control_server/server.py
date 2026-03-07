@@ -29,169 +29,510 @@ SERVICE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 SESSIONS = {}
 SESSIONS_LOCK = threading.Lock()
 
-DASHBOARD_HTML = """<!doctype html>
+DASHBOARD_HTML = """<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>NEXUS Control Server</title>
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <style>
-    :root {
-      --bg: #0f172a;
-      --card: #111827;
-      --ink: #e5e7eb;
-      --muted: #94a3b8;
-      --ok: #16a34a;
-      --bad: #dc2626;
-      --line: #334155;
-      --btn: #1d4ed8;
-    }
-    * { box-sizing: border-box; }
-    body { margin: 0; font-family: ui-sans-serif, Segoe UI, Arial, sans-serif; background: linear-gradient(135deg, #0f172a, #111827); color: var(--ink); }
-    .wrap { max-width: 1040px; margin: 0 auto; padding: 24px; }
-    h1 { margin: 0 0 16px; font-size: 28px; }
-    .card { background: rgba(17,24,39,.92); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 16px; }
-    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-    input, button, select { border-radius: 10px; border: 1px solid var(--line); background: #0b1220; color: var(--ink); padding: 10px 12px; }
-    button { background: var(--btn); border: 1px solid #1e40af; cursor: pointer; }
-    button:hover { filter: brightness(1.08); }
-    .tbl { width: 100%; border-collapse: collapse; }
-    .tbl th, .tbl td { padding: 10px; border-bottom: 1px solid var(--line); text-align: left; font-size: 14px; }
-    .muted { color: var(--muted); }
-    .ok { color: var(--ok); font-weight: 700; }
-    .bad { color: var(--bad); font-weight: 700; }
-    pre { margin: 0; white-space: pre-wrap; background: #020617; border: 1px solid var(--line); border-radius: 10px; padding: 12px; max-height: 320px; overflow: auto; }
-    .hidden { display: none; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS — Control Server</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=VT323&display=swap');
+
+  :root {
+    --bg: #020b08;
+    --bg2: #041410;
+    --green: #00ff88;
+    --green-dim: #00994d;
+    --green-faint: #00ff8812;
+    --amber: #ffb700;
+    --red: #ff3b5c;
+    --cyan: #00d4ff;
+    --text: #b8ffe0;
+    --text-dim: #4a8f6a;
+    --border: #1a4a30;
+    --glow: 0 0 12px #00ff8844, 0 0 30px #00ff8811;
+    --glow-strong: 0 0 20px #00ff8888, 0 0 60px #00ff8822;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 14px;
+    line-height: 1.7;
+    overflow-x: hidden;
+    min-height: 100vh;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.07) 2px, rgba(0,0,0,0.07) 4px);
+    pointer-events: none; z-index: 9999;
+  }
+
+  @keyframes flicker { 0%,100%{opacity:1} 92%{opacity:1} 93%{opacity:.93} 94%{opacity:1} 97%{opacity:.96} }
+  body { animation: flicker 8s infinite; }
+
+  .grid-bg {
+    position: fixed; inset: 0;
+    background-image: linear-gradient(rgba(0,255,136,.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,255,136,.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none; z-index: 0;
+  }
+
+  /* LOGIN */
+  #login-screen {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 10;
+  }
+
+  .login-wrap {
+    position: relative;
+    width: 440px;
+    border: 1px solid var(--border);
+    background: rgba(2,15,10,.97);
+    padding: 48px;
+    text-align: center;
+  }
+
+  .login-wrap::before, .login-wrap::after,
+  .login-wrap .corner-br, .login-wrap .corner-bl {
+    content: '';
+    position: absolute;
+    width: 18px; height: 18px;
+  }
+  .login-wrap::before  { top:-1px;    left:-1px;  border-top: 2px solid var(--green);  border-left:  2px solid var(--green); }
+  .login-wrap::after   { top:-1px;    right:-1px; border-top: 2px solid var(--green);  border-right: 2px solid var(--green); }
+  .login-wrap .corner-br { bottom:-1px; right:-1px; border-bottom: 2px solid var(--green); border-right: 2px solid var(--green); }
+  .login-wrap .corner-bl { bottom:-1px; left:-1px;  border-bottom: 2px solid var(--green); border-left:  2px solid var(--green); }
+
+  .login-wrap-glow {
+    position: absolute; top: -1px; left: 20%; right: 20%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--green), transparent);
+  }
+
+  .login-sys-tag {
+    font-size: 10px; letter-spacing: 4px; color: var(--text-dim);
+    text-transform: uppercase; margin-bottom: 32px;
+  }
+  .login-sys-tag span { color: var(--green-dim); }
+
+  .login-logo {
+    font-family: 'Orbitron', monospace;
+    font-size: 54px; font-weight: 900;
+    color: var(--green);
+    text-shadow: var(--glow-strong);
+    letter-spacing: 10px;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .login-subtitle {
+    font-size: 10px; letter-spacing: 5px; color: var(--text-dim);
+    text-transform: uppercase; margin-bottom: 40px;
+  }
+
+  .login-divider {
+    border: none; border-top: 1px solid var(--border);
+    margin: 32px 0;
+    position: relative;
+  }
+  .login-divider::after {
+    content: 'AUTH';
+    position: absolute; top: -8px; left: 50%; transform: translateX(-50%);
+    background: rgba(2,15,10,.97);
+    padding: 0 12px;
+    font-size: 9px; letter-spacing: 3px; color: var(--text-dim);
+  }
+
+  .google-btn-wrap {
+    width: 100%;
+    border: 1px solid var(--green-dim);
+    padding: 14px 0 10px;
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    position: relative;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .google-btn-wrap:hover {
+    border-color: var(--green);
+    box-shadow: var(--glow);
+  }
+  .google-btn-label {
+    font-family: 'Orbitron', monospace;
+    font-size: 9px; font-weight: 700; letter-spacing: 4px;
+    color: var(--green-dim); text-transform: uppercase;
+  }
+  #google-btn-real { display: flex; justify-content: center; }
+  /* Strip Google button border/shadow to blend in */
+  #google-btn-real > div { box-shadow: none !important; }
+
+  #login-status {
+    margin-top: 20px;
+    font-size: 11px; letter-spacing: 2px;
+    color: var(--text-dim); min-height: 18px;
+  }
+
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+  .status-blink { animation: blink 1s step-end infinite; }
+
+  .login-footer {
+    margin-top: 36px;
+    font-size: 10px; letter-spacing: 2px; color: var(--text-dim);
+    opacity: 0.5;
+  }
+
+  /* DASHBOARD */
+  #dashboard { display: none; position: relative; z-index: 2; }
+
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(2,11,8,.96);
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(12px);
+    padding: 12px 0;
+  }
+  .nav-inner {
+    max-width: 1100px; margin: 0 auto; padding: 0 28px;
+    display: flex; align-items: center; gap: 20px;
+  }
+  .nav-logo {
+    font-family: 'Orbitron', monospace; font-size: 16px; font-weight: 900;
+    color: var(--green); letter-spacing: 6px;
+    text-shadow: var(--glow); margin-right: auto;
+  }
+  .nav-logo span { font-size: 10px; letter-spacing: 3px; color: var(--text-dim); font-weight: 400; font-family: 'Share Tech Mono', monospace; display: block; }
+
+  .nav-user {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 11px; color: var(--text-dim); letter-spacing: 1px;
+  }
+  .nav-user-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--green); box-shadow: 0 0 8px var(--green);
+  }
+  .nav-user em { color: var(--green); font-style: normal; }
+
+  .nav-logout {
+    background: transparent; border: 1px solid var(--border);
+    color: var(--text-dim); font-family: 'Share Tech Mono', monospace;
+    font-size: 10px; letter-spacing: 2px; padding: 5px 12px;
+    cursor: pointer; transition: all 0.2s; text-transform: uppercase;
+  }
+  .nav-logout:hover { border-color: var(--red); color: var(--red); }
+
+  main { max-width: 1100px; margin: 0 auto; padding: 32px 28px; }
+
+  .section-label {
+    font-size: 10px; color: var(--green-dim);
+    letter-spacing: 4px; text-transform: uppercase; margin-bottom: 6px;
+  }
+  h2 {
+    font-family: 'Orbitron', monospace; font-size: 14px; font-weight: 700;
+    color: var(--green); letter-spacing: 3px; text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+
+  .panel {
+    border: 1px solid var(--border);
+    background: rgba(4,20,16,.7);
+    margin-bottom: 24px;
+    position: relative; overflow: hidden;
+  }
+  .panel::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--green-dim), transparent);
+  }
+
+  .panel-header {
+    background: rgba(0,0,0,.3);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 20px;
+    display: flex; align-items: center; gap: 8px;
+    font-size: 10px; color: var(--text-dim); letter-spacing: 3px; text-transform: uppercase;
+  }
+  .panel-dot { width: 7px; height: 7px; border-radius: 50%; }
+  .pd-red   { background: #ff3b5c44; border: 1px solid #ff3b5c55; }
+  .pd-amber { background: #ffb70044; border: 1px solid #ffb70055; }
+  .pd-green { background: #00ff8844; border: 1px solid #00ff8855; }
+  .panel-body { padding: 20px 24px; }
+
+  .svc-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .svc-table th {
+    font-family: 'Orbitron', monospace; font-size: 9px; letter-spacing: 2px;
+    color: var(--text-dim); text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+    padding: 8px 12px 8px 0; text-align: left;
+  }
+  .svc-table td {
+    padding: 12px 12px 12px 0;
+    border-bottom: 1px solid rgba(26,74,48,.35);
+    vertical-align: middle;
+  }
+  .svc-table tr:last-child td { border-bottom: none; }
+  .svc-table tr:hover td { background: var(--green-faint); }
+
+  .svc-name { color: var(--cyan); font-weight: 600; }
+  .svc-cmd  { color: var(--text-dim); font-size: 11px; }
+  .svc-pid  { color: var(--text-dim); font-size: 12px; }
+
+  @keyframes pulse { 0%,100%{opacity:1;box-shadow:0 0 8px var(--green)} 50%{opacity:.5;box-shadow:0 0 3px var(--green)} }
+
+  .status-running {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-family: 'Orbitron', monospace; font-size: 9px; font-weight: 700;
+    letter-spacing: 2px; color: var(--green);
+  }
+  .status-running::before {
+    content: ''; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--green); box-shadow: 0 0 8px var(--green);
+    animation: pulse 2s ease infinite;
+  }
+  .status-stopped {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-family: 'Orbitron', monospace; font-size: 9px; font-weight: 700;
+    letter-spacing: 2px; color: var(--red);
+  }
+  .status-stopped::before {
+    content: ''; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--red);
+  }
+
+  .btn-start, .btn-stop {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+    padding: 5px 14px; border: 1px solid;
+    background: transparent; cursor: pointer; transition: all 0.15s;
+    margin-right: 4px;
+  }
+  .btn-start { color: var(--green); border-color: var(--green-dim); }
+  .btn-start:hover { background: var(--green-faint); box-shadow: 0 0 10px #00ff8833; }
+  .btn-stop  { color: var(--red); border-color: #66001a; }
+  .btn-stop:hover  { background: rgba(255,59,92,.08); }
+
+  .btn-refresh {
+    font-family: 'Orbitron', monospace; font-size: 9px; font-weight: 700;
+    letter-spacing: 3px; text-transform: uppercase;
+    background: transparent; border: 1px solid var(--green-dim);
+    color: var(--green); padding: 7px 20px;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .btn-refresh:hover { box-shadow: var(--glow); background: var(--green-faint); }
+
+  .logs-controls {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap;
+  }
+  .logs-select, .logs-lines {
+    background: #010d08; border: 1px solid var(--border);
+    color: var(--text); font-family: 'Share Tech Mono', monospace;
+    font-size: 12px; padding: 7px 12px;
+  }
+  .logs-select:focus, .logs-lines:focus { outline: none; border-color: var(--green-dim); }
+
+  .btn-load-logs {
+    font-family: 'Orbitron', monospace; font-size: 9px; font-weight: 700;
+    letter-spacing: 2px; text-transform: uppercase;
+    background: transparent; border: 1px solid var(--cyan);
+    color: var(--cyan); padding: 7px 18px;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .btn-load-logs:hover { background: rgba(0,212,255,.08); box-shadow: 0 0 12px rgba(0,212,255,.2); }
+
+  .logs-output {
+    background: #010d08; border: 1px solid var(--border);
+    padding: 16px 20px;
+    font-size: 12px; line-height: 1.7; color: var(--text-dim);
+    white-space: pre-wrap; word-break: break-all;
+    max-height: 360px; overflow-y: auto; min-height: 80px;
+  }
+  .logs-output::-webkit-scrollbar { width: 4px; }
+  .logs-output::-webkit-scrollbar-thumb { background: var(--border); }
+
+  .status-bar {
+    display: flex; align-items: center; gap: 20px;
+    padding: 10px 0; border-top: 1px solid var(--border);
+    margin-top: 24px;
+    font-size: 11px; color: var(--text-dim); letter-spacing: 1px;
+  }
+  .status-bar-item { display: flex; align-items: center; gap: 6px; }
+  .status-bar-item .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--green-dim); }
+  .status-bar-time { margin-left: auto; font-size: 10px; }
+
+  #toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: rgba(2,20,12,.95);
+    border: 1px solid var(--green-dim);
+    color: var(--green);
+    font-size: 11px; letter-spacing: 2px;
+    padding: 12px 20px; z-index: 9998;
+    transform: translateY(20px); opacity: 0;
+    transition: all 0.25s; pointer-events: none;
+  }
+  #toast.show { transform: translateY(0); opacity: 1; }
+  #toast.error { border-color: #66001a; color: var(--red); }
+
+  .empty-state {
+    text-align: center; padding: 40px 20px;
+    color: var(--text-dim); font-size: 12px; letter-spacing: 2px;
+  }
+  .empty-state .icon { font-size: 32px; margin-bottom: 12px; opacity: .4; }
+</style>
 </head>
 <body>
-  <div class="wrap">
-    <h1>NEXUS Control Server</h1>
 
-    <div class="card">
-      <div class="row">
-        <label for="token">Token de acesso:</label>
-        <input id="token" type="password" placeholder="Bearer token" style="min-width:320px" />
-        <button onclick="refreshServices()">Atualizar</button>
-      </div>
-      <p class="muted">Gestao do NEXUS pelo navegador (Google Chrome) com autenticacao por token e opcionalmente por conta Google.</p>
-      <div id="googleBlock" class="hidden">
-        <div class="row">
-          <div id="googleSignIn"></div>
-          <span id="googleMsg" class="muted"></span>
-        </div>
-      </div>
-    </div>
+<div class="grid-bg"></div>
 
-    <div class="card">
-      <table class="tbl" id="svcTable">
-        <thead>
-          <tr><th>Servico</th><th>Status</th><th>PID</th><th>Comando</th><th>Acoes</th></tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+<div id="login-screen">
+  <div class="login-wrap">
+    <div class="login-wrap-glow"></div>
+    <div class="corner-br"></div>
+    <div class="corner-bl"></div>
+    <div class="login-sys-tag">Sistema de controle remoto · <span>NEXUS-OS</span></div>
+    <div class="login-logo">NEXUS</div>
+    <div class="login-subtitle">Control Server · v1.0</div>
+    <hr class="login-divider">
+    <div class="google-btn-wrap">
+      <div class="google-btn-label">— AUTENTICAR COM GOOGLE —</div>
+      <div id="google-btn-real"></div>
     </div>
-
-    <div class="card">
-      <div class="row">
-        <label for="logsService">Logs:</label>
-        <select id="logsService"></select>
-        <input id="logLines" type="number" min="1" max="1000" value="200" style="width:120px" />
-        <button onclick="loadLogs()">Carregar logs</button>
-      </div>
-      <pre id="logsBox"></pre>
-    </div>
+    <div id="login-status"><span class="status-blink" id="login-cursor" style="display:none">█</span><span id="login-msg"></span></div>
+    <div class="login-footer">ACESSO RESTRITO · SOMENTE CONTAS AUTORIZADAS</div>
   </div>
+</div>
+
+<div id="dashboard">
+  <nav>
+    <div class="nav-inner">
+      <div class="nav-logo">
+        NEXUS
+        <span>Control Server</span>
+      </div>
+      <div class="nav-user">
+        <div class="nav-user-dot"></div>
+        Sessão ativa · <em id="nav-email">—</em>
+      </div>
+      <button class="nav-logout" onclick="logout()">[ sair ]</button>
+    </div>
+  </nav>
+
+  <main>
+    <div class="section-label">// 01</div>
+    <h2>Serviços</h2>
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-dot pd-red"></div>
+        <div class="panel-dot pd-amber"></div>
+        <div class="panel-dot pd-green"></div>
+        <span style="margin-left:8px;">nexus — processos gerenciados</span>
+        <button class="btn-refresh" style="margin-left:auto" onclick="refreshServices()">↺ Atualizar</button>
+      </div>
+      <div class="panel-body">
+        <table class="svc-table">
+          <thead>
+            <tr>
+              <th>Serviço</th><th>Status</th><th>PID</th><th>Comando</th><th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="svc-tbody">
+            <tr><td colspan="5"><div class="empty-state"><div class="icon">⟳</div>Carregando...</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section-label">// 02</div>
+    <h2>Logs</h2>
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-dot pd-red"></div>
+        <div class="panel-dot pd-amber"></div>
+        <div class="panel-dot pd-green"></div>
+        <span style="margin-left:8px;">stdout — stream de saída</span>
+      </div>
+      <div class="panel-body">
+        <div class="logs-controls">
+          <select id="logs-service" class="logs-select"></select>
+          <input id="logs-lines" type="number" min="1" max="1000" value="200" class="logs-lines" style="width:90px">
+          <button class="btn-load-logs" onclick="loadLogs()">▶ Carregar</button>
+        </div>
+        <div class="logs-output" id="logs-output">(sem logs)</div>
+      </div>
+    </div>
+
+    <div class="status-bar">
+      <div class="status-bar-item"><div class="dot"></div>Worker: nexus-control.projeton-e-x-u-sdepain85352.workers.dev</div>
+      <div class="status-bar-item"><div class="dot"></div>Porta local: 8787</div>
+      <div class="status-bar-time" id="status-time">—</div>
+    </div>
+  </main>
+</div>
+
+<div id="toast"></div>
 
 <script>
+let authToken = null;
 let googleCfg = { google_enabled: false, google_client_id: null };
 
-function tokenHeader() {
-  const t = document.getElementById('token').value.trim();
-  return t ? { 'Authorization': 'Bearer ' + t } : {};
+function toast(msg, isError = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show' + (isError ? ' error' : '');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => { t.className = ''; }, 3500);
 }
 
-async function api(path, opts={}) {
-  const headers = Object.assign({}, tokenHeader(), opts.headers || {});
-  const res = await fetch(path, Object.assign({}, opts, { headers }));
+function loginStatus(msg, blinking = false) {
+  document.getElementById('login-msg').textContent = msg;
+  document.getElementById('login-cursor').style.display = blinking ? 'inline' : 'none';
+}
+
+async function api(path, opts = {}) {
+  const headers = { ...(authToken ? { 'Authorization': 'Bearer ' + authToken } : {}), ...(opts.headers || {}) };
+  const res = await fetch(path, { ...opts, headers });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+  if (!res.ok) throw new Error(data.error || 'HTTP ' + res.status);
   return data;
-}
-
-async function refreshServices() {
-  try {
-    const data = await api('/api/services');
-    const tb = document.querySelector('#svcTable tbody');
-    tb.innerHTML = '';
-
-    const sel = document.getElementById('logsService');
-    sel.innerHTML = '';
-
-    data.services.forEach(s => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${s.name}</td>
-        <td class="${s.running ? 'ok' : 'bad'}">${s.running ? 'RUNNING' : 'STOPPED'}</td>
-        <td>${s.pid || '--'}</td>
-        <td class="muted">${s.command.join(' ')}</td>
-        <td>
-          <button onclick="startSvc('${s.name}')">Start</button>
-          <button onclick="stopSvc('${s.name}')">Stop</button>
-        </td>`;
-      tb.appendChild(tr);
-
-      const opt = document.createElement('option');
-      opt.value = s.name;
-      opt.textContent = s.name;
-      sel.appendChild(opt);
-    });
-  } catch (e) {
-    alert(e.message);
-  }
-}
-
-async function startSvc(name) {
-  try {
-    await api('/api/services/' + encodeURIComponent(name) + '/start', { method: 'POST' });
-    await refreshServices();
-  } catch (e) {
-    alert(e.message);
-  }
-}
-
-async function stopSvc(name) {
-  try {
-    await api('/api/services/' + encodeURIComponent(name) + '/stop', { method: 'POST' });
-    await refreshServices();
-  } catch (e) {
-    alert(e.message);
-  }
-}
-
-async function loadLogs() {
-  const name = document.getElementById('logsService').value;
-  const lines = Number(document.getElementById('logLines').value || 200);
-  if (!name) return;
-  try {
-    const data = await api('/api/logs/' + encodeURIComponent(name) + '?lines=' + lines);
-    document.getElementById('logsBox').textContent = data.logs || '(sem logs)';
-  } catch (e) {
-    alert(e.message);
-  }
 }
 
 async function fetchAuthConfig() {
   try {
     const data = await fetch('/api/auth/config').then(r => r.json());
     googleCfg = data;
-  } catch {
-    googleCfg = { google_enabled: false, google_client_id: null };
+  } catch { googleCfg = { google_enabled: false, google_client_id: null }; }
+}
+
+function setupGoogleButton() {
+  if (!window.google || !google.accounts || !googleCfg.google_client_id) {
+    setTimeout(setupGoogleButton, 500);
+    return;
   }
+  google.accounts.id.initialize({
+    client_id: googleCfg.google_client_id,
+    callback: onGoogleCredential,
+    auto_select: false,
+    ux_mode: 'popup'
+  });
+  const container = document.getElementById('google-btn-real');
+  container.innerHTML = '';
+  google.accounts.id.renderButton(container, {
+    theme: 'filled_black',
+    size: 'large',
+    width: 300,
+    text: 'signin_with',
+    shape: 'rectangular'
+  });
+  loginStatus('Pronto. Clique em autenticar.', false);
 }
 
 async function onGoogleCredential(response) {
+  loginStatus('Verificando credenciais...', true);
   try {
     const res = await fetch('/api/auth/google', {
       method: 'POST',
@@ -199,35 +540,110 @@ async function onGoogleCredential(response) {
       body: JSON.stringify({ id_token: response.credential })
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Falha na autenticacao Google');
-    document.getElementById('token').value = data.token;
-    document.getElementById('googleMsg').textContent = 'Autenticado como ' + data.email;
-    await refreshServices();
+    if (!res.ok) throw new Error(data.error || 'Acesso negado');
+    authToken = data.token;
+    showDashboard(data.email);
   } catch (e) {
-    alert(e.message);
+    loginStatus('⚠ ' + e.message, false);
   }
 }
-window.onGoogleCredential = onGoogleCredential;
 
-function setupGoogleSignIn() {
-  if (!googleCfg.google_enabled || !googleCfg.google_client_id || !window.google || !google.accounts || !google.accounts.id) {
-    return;
+function showDashboard(email) {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+  document.getElementById('nav-email').textContent = email;
+  refreshServices();
+  updateClock();
+  setInterval(updateClock, 1000);
+}
+
+function logout() {
+  authToken = null;
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('dashboard').style.display = 'none';
+  loginStatus('Sessao encerrada.', false);
+  if (window.google?.accounts?.id) google.accounts.id.disableAutoSelect();
+}
+
+async function refreshServices() {
+  try {
+    const data = await api('/api/services');
+    const tbody = document.getElementById('svc-tbody');
+    const sel   = document.getElementById('logs-service');
+    const prev  = sel.value;
+    tbody.innerHTML = '';
+    sel.innerHTML   = '';
+
+    if (!data.services?.length) {
+      tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="icon">◌</div>Nenhum servico configurado</div></td></tr>';
+      return;
+    }
+
+    data.services.forEach(s => {
+      const tr = document.createElement('tr');
+      const statusHtml = s.running
+        ? '<span class="status-running">RUNNING</span>'
+        : '<span class="status-stopped">STOPPED</span>';
+      tr.innerHTML =
+        '<td><span class="svc-name">' + s.name + '</span></td>' +
+        '<td>' + statusHtml + '</td>' +
+        '<td><span class="svc-pid">' + (s.pid || '--') + '</span></td>' +
+        '<td><span class="svc-cmd">' + s.command.join(' ') + '</span></td>' +
+        '<td>' +
+          '<button class="btn-start" onclick="startSvc(\'' + s.name + '\')">&#9654; Start</button>' +
+          '<button class="btn-stop"  onclick="stopSvc(\''  + s.name + '\')">&#9632; Stop</button>' +
+        '</td>';
+      tbody.appendChild(tr);
+
+      const opt = document.createElement('option');
+      opt.value = s.name; opt.textContent = s.name;
+      sel.appendChild(opt);
+    });
+
+    if (prev) sel.value = prev;
+  } catch (e) {
+    toast(e.message, true);
   }
-  document.getElementById('googleBlock').classList.remove('hidden');
-  google.accounts.id.initialize({
-    client_id: googleCfg.google_client_id,
-    callback: onGoogleCredential
-  });
-  google.accounts.id.renderButton(
-    document.getElementById('googleSignIn'),
-    { theme: 'outline', size: 'large', text: 'signin_with' }
-  );
+}
+
+async function startSvc(name) {
+  try {
+    await api('/api/services/' + encodeURIComponent(name) + '/start', { method: 'POST' });
+    toast('▶ ' + name + ' iniciado');
+    await refreshServices();
+  } catch (e) { toast(e.message, true); }
+}
+
+async function stopSvc(name) {
+  try {
+    await api('/api/services/' + encodeURIComponent(name) + '/stop', { method: 'POST' });
+    toast('■ ' + name + ' encerrado');
+    await refreshServices();
+  } catch (e) { toast(e.message, true); }
+}
+
+async function loadLogs() {
+  const name  = document.getElementById('logs-service').value;
+  const lines = document.getElementById('logs-lines').value || 200;
+  if (!name) return;
+  const box = document.getElementById('logs-output');
+  box.textContent = 'Carregando...';
+  try {
+    const data = await api('/api/logs/' + encodeURIComponent(name) + '?lines=' + lines);
+    box.textContent = data.logs || '(sem logs)';
+    box.scrollTop = box.scrollHeight;
+  } catch (e) { box.textContent = '⚠ ' + e.message; }
+}
+
+function updateClock() {
+  const now = new Date();
+  document.getElementById('status-time').textContent =
+    now.toLocaleDateString('pt-BR') + ' · ' + now.toLocaleTimeString('pt-BR');
 }
 
 (async function boot() {
   await fetchAuthConfig();
-  setupGoogleSignIn();
-  refreshServices();
+  setupGoogleButton();
 })();
 </script>
 </body>
@@ -266,10 +682,6 @@ def is_pid_running(pid: int) -> bool:
         return True
     except Exception:
         return False
-
-
-def expected_token() -> str:
-    return os.environ.get("NEXUS_CONTROL_TOKEN", "").strip()
 
 
 def google_client_id() -> str:
@@ -392,13 +804,7 @@ class ServiceManager:
             return out
 
     def _resolve_command(self, cmd):
-        resolved = []
-        for token in cmd:
-            if token == "{python}":
-                resolved.append(sys.executable)
-            else:
-                resolved.append(token)
-        return resolved
+        return [sys.executable if token == "{python}" else token for token in cmd]
 
     def start_service(self, name: str):
         with self.lock:
@@ -413,12 +819,7 @@ class ServiceManager:
             if existing:
                 pid = int(existing.get("pid", 0) or 0)
                 if is_pid_running(pid):
-                    return {
-                        "name": name,
-                        "running": True,
-                        "pid": pid,
-                        "already_running": True,
-                    }
+                    return {"name": name, "running": True, "pid": pid, "already_running": True}
 
             spec = cfg[name]
             cmd = self._resolve_command(spec.get("command", []))
@@ -433,16 +834,11 @@ class ServiceManager:
             log_file = LOG_DIR / f"{name}.log"
             log_fp = log_file.open("a", encoding="utf-8")
 
-            creationflags = 0
-            if os.name == "nt":
-                creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
+            creationflags = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
 
             proc = subprocess.Popen(
-                cmd,
-                cwd=str(cwd),
-                env=env,
-                stdout=log_fp,
-                stderr=subprocess.STDOUT,
+                cmd, cwd=str(cwd), env=env,
+                stdout=log_fp, stderr=subprocess.STDOUT,
                 creationflags=creationflags,
             )
             log_fp.close()
@@ -455,7 +851,6 @@ class ServiceManager:
                 "cwd": str(cwd),
             }
             self._save_state(state)
-
             return {"name": name, "running": True, "pid": proc.pid, "already_running": False}
 
     def stop_service(self, name: str):
@@ -493,7 +888,6 @@ class ServiceManager:
 
     def read_logs(self, name: str, lines: int = 200) -> str:
         lines = max(1, min(lines, MAX_LOG_LINES))
-
         state = self._state()
         log_file = None
 
@@ -551,25 +945,15 @@ def clean_service_name(raw: str) -> str:
 
 def require_auth(handler: BaseHTTPRequestHandler, query) -> bool:
     provided = read_token_from_request(handler, query)
-    static_token = expected_token()
-
-    if static_token and provided == static_token:
-        return True
 
     if validate_session(provided):
         return True
 
-    if not static_token and not google_enabled():
-        json_response(
-            handler,
-            503,
-            {
-                "error": "Autenticacao nao configurada. Defina NEXUS_CONTROL_TOKEN ou habilite Google auth.",
-            },
-        )
+    if not google_enabled():
+        json_response(handler, 503, {"error": "Autenticacao nao configurada. Habilite Google auth."})
         return False
 
-    json_response(handler, 401, {"error": "token invalido"})
+    json_response(handler, 401, {"error": "sessao invalida ou expirada"})
     return False
 
 
@@ -591,7 +975,7 @@ def read_json_body(handler: BaseHTTPRequestHandler):
 
 def make_handler(manager: ServiceManager):
     class Handler(BaseHTTPRequestHandler):
-        server_version = "NexusControl/0.2"
+        server_version = "NexusControl/1.0"
 
         def log_message(self, fmt, *args):
             print(f"[HTTP] {self.address_string()} - {fmt % args}")
@@ -607,14 +991,10 @@ def make_handler(manager: ServiceManager):
                 return json_response(self, 200, {"status": "ok", "time": now_iso()})
 
             if parsed.path == "/api/auth/config":
-                return json_response(
-                    self,
-                    200,
-                    {
-                        "google_enabled": google_enabled(),
-                        "google_client_id": google_client_id() if google_enabled() else None,
-                    },
-                )
+                return json_response(self, 200, {
+                    "google_enabled": google_enabled(),
+                    "google_client_id": google_client_id() if google_enabled() else None,
+                })
 
             if parsed.path == "/api/services":
                 if not require_auth(self, query):
@@ -660,13 +1040,12 @@ def make_handler(manager: ServiceManager):
             if parsed.path.startswith("/api/services/") and parsed.path.endswith("/start"):
                 if not require_auth(self, query):
                     return
-                raw_name = parsed.path[len("/api/services/") : -len("/start")]
+                raw_name = parsed.path[len("/api/services/"):-len("/start")]
                 name = clean_service_name(raw_name)
                 if not name:
                     return json_response(self, 400, {"error": "nome de servico ausente"})
                 try:
-                    payload = manager.start_service(name)
-                    return json_response(self, 200, payload)
+                    return json_response(self, 200, manager.start_service(name))
                 except ValueError as e:
                     return json_response(self, 404, {"error": str(e)})
                 except Exception as e:
@@ -675,13 +1054,12 @@ def make_handler(manager: ServiceManager):
             if parsed.path.startswith("/api/services/") and parsed.path.endswith("/stop"):
                 if not require_auth(self, query):
                     return
-                raw_name = parsed.path[len("/api/services/") : -len("/stop")]
+                raw_name = parsed.path[len("/api/services/"):-len("/stop")]
                 name = clean_service_name(raw_name)
                 if not name:
                     return json_response(self, 400, {"error": "nome de servico ausente"})
                 try:
-                    payload = manager.stop_service(name)
-                    return json_response(self, 200, payload)
+                    return json_response(self, 200, manager.stop_service(name))
                 except Exception as e:
                     return json_response(self, 500, {"error": str(e)})
 
@@ -699,10 +1077,6 @@ def main():
 
     server = ThreadingHTTPServer((host, port), handler)
     print(f"[NEXUS Control] Listening on http://{host}:{port}")
-    if expected_token():
-        print("[NEXUS Control] Static token auth: ENABLED")
-    else:
-        print("[NEXUS Control] Static token auth: DISABLED")
 
     if google_enabled():
         allow = allowed_google_emails()
@@ -712,12 +1086,9 @@ def main():
     else:
         print("[NEXUS Control] Google auth: DISABLED")
 
-    print("[NEXUS Control] Abra no Google Chrome e faça login/token no painel.")
+    print("[NEXUS Control] Abra no Google Chrome e faca login no painel.")
     server.serve_forever()
 
 
 if __name__ == "__main__":
     main()
-
-
-
