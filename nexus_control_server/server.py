@@ -11,6 +11,10 @@ import threading
 import time
 import urllib.parse
 import urllib.request
+try:
+    import pty
+except Exception:
+    pty = None
 from collections import deque
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -34,6 +38,8 @@ MAX_JSON_BODY_BYTES = 32 * 1024
 MAX_TOKEN_LENGTH = 256
 TOKEN_RE = re.compile(r"^[A-Za-z0-9._~-]{20,256}$")
 MAX_STDIN_INPUT_BYTES = 2048
+TERMINAL_BUFFER_MAX_CHUNKS = 4096
+TERMINAL_RESPONSE_MAX_CHARS = 64000
 SESSION_MAX_PER_EMAIL = 5
 SESSION_BIND_CONTEXT = os.environ.get("NEXUS_SESSION_BIND_CONTEXT", "1").strip().lower() not in {"0", "false", "no"}
 AUTH_RATE_LIMIT_WINDOW_SECONDS = 5 * 60
@@ -304,6 +310,112 @@ class ServiceManager:
     def _save_state(self, state) -> None:
         write_json(self.state_path, state)
 
+    def _is_interactive_service(self, spec: dict) -> bool:
+        return bool(spec.get("interactive", False))
+
+    def _resolve_command(self, cmd):
+        return [sys.executable if token == "{python}" else token for token in cmd]
+
+    def _terminate_pid(self, pid: int) -> None:
+        if pid <= 0:
+            return
+
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], check=False)
+            return
+
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except ProcessLookupError:
+            return
+
+        deadline = time.time() + 5
+        while time.time() < deadline and is_pid_running(pid):
+            time.sleep(0.2)
+
+        if is_pid_running(pid):
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+
+    def _teardown_runtime(self, name: str) -> None:
+        info = self.runtime_processes.pop(name, None)
+        if not info:
+            return
+
+        stdin_obj = info.get("stdin")
+        if stdin_obj:
+            try:
+                stdin_obj.close()
+            except Exception:
+                pass
+
+        pty_master_fd = info.get("pty_master_fd")
+        if isinstance(pty_master_fd, int):
+            try:
+                os.close(pty_master_fd)
+            except OSError:
+                pass
+
+    def _push_terminal_output(self, name: str, text: str) -> None:
+        if not text:
+            return
+
+        with self.lock:
+            info = self.runtime_processes.get(name)
+            if not info:
+                return
+            chunks = info.get("output_chunks")
+            if isinstance(chunks, deque):
+                chunks.append(text)
+
+    def _start_pty_reader(self, name: str, master_fd: int, log_file: Path):
+        def _reader_loop():
+            with log_file.open("a", encoding="utf-8") as log_fp:
+                while True:
+                    try:
+                        data = os.read(master_fd, 4096)
+                    except OSError:
+                        break
+
+                    if not data:
+                        break
+
+                    text = data.decode("utf-8", errors="replace")
+                    log_fp.write(text)
+                    log_fp.flush()
+                    self._push_terminal_output(name, text)
+
+            try:
+                os.close(master_fd)
+            except OSError:
+                pass
+
+        thread = threading.Thread(target=_reader_loop, daemon=True, name=f"nexus-pty-{name}")
+        thread.start()
+        return thread
+
+    def _start_pipe_reader(self, name: str, proc: subprocess.Popen, log_file: Path):
+        def _reader_loop():
+            with log_file.open("a", encoding="utf-8") as log_fp:
+                stream = proc.stdout
+                if stream is None:
+                    return
+
+                while True:
+                    chunk = stream.readline()
+                    if not chunk:
+                        break
+
+                    log_fp.write(chunk)
+                    log_fp.flush()
+                    self._push_terminal_output(name, chunk)
+
+        thread = threading.Thread(target=_reader_loop, daemon=True, name=f"nexus-pipe-{name}")
+        thread.start()
+        return thread
+
     def _cleanup(self, state) -> None:
         to_delete = []
         for name, meta in state.get("services", {}).items():
@@ -313,9 +425,14 @@ class ServiceManager:
 
         for name in to_delete:
             state["services"].pop(name, None)
+            self._teardown_runtime(name)
 
         dead_runtime = []
-        for name, proc in list(self.runtime_processes.items()):
+        for name, info in list(self.runtime_processes.items()):
+            proc = info.get("proc")
+            if not proc:
+                dead_runtime.append(name)
+                continue
             try:
                 if proc.poll() is not None:
                     dead_runtime.append(name)
@@ -323,15 +440,7 @@ class ServiceManager:
                 dead_runtime.append(name)
 
         for name in dead_runtime:
-            proc = self.runtime_processes.pop(name, None)
-            if proc and proc.stdin:
-                try:
-                    proc.stdin.close()
-                except Exception:
-                    pass
-
-    def _is_interactive_service(self, spec: dict) -> bool:
-        return bool(spec.get("interactive", False))
+            self._teardown_runtime(name)
 
     def list_services(self):
         with self.lock:
@@ -344,8 +453,15 @@ class ServiceManager:
             for name, spec in cfg.items():
                 proc_state = state.get("services", {}).get(name, {})
                 pid = int(proc_state.get("pid", 0) or 0)
-                runtime_proc = self.runtime_processes.get(name)
-                stdin_available = bool(runtime_proc and runtime_proc.poll() is None and runtime_proc.stdin)
+                info = self.runtime_processes.get(name)
+                runtime_proc = info.get("proc") if info else None
+                running_runtime = bool(runtime_proc and runtime_proc.poll() is None)
+                stdin_available = bool(
+                    info
+                    and running_runtime
+                    and (info.get("pty_master_fd") is not None or info.get("stdin") is not None)
+                )
+
                 out.append({
                     "name": name,
                     "running": is_pid_running(pid),
@@ -359,14 +475,14 @@ class ServiceManager:
                 })
             return out
 
-    def _resolve_command(self, cmd):
-        return [sys.executable if token == "{python}" else token for token in cmd]
-
     def start_service(self, name: str):
         with self.lock:
             cfg = self.config()
             if name not in cfg:
                 raise ValueError(f"Servico '{name}' nao existe")
+
+            spec = cfg[name]
+            interactive = self._is_interactive_service(spec)
 
             state = self._state()
             self._cleanup(state)
@@ -375,9 +491,20 @@ class ServiceManager:
             if existing:
                 pid = int(existing.get("pid", 0) or 0)
                 if is_pid_running(pid):
-                    return {"name": name, "running": True, "pid": pid, "already_running": True}
+                    info = self.runtime_processes.get(name)
+                    if interactive and not info:
+                        # Processo legado sem canal TTY em memoria.
+                        # Reinicia para anexar terminal remoto corretamente.
+                        self._terminate_pid(pid)
+                        state["services"].pop(name, None)
+                    else:
+                        return {
+                            "name": name,
+                            "running": True,
+                            "pid": pid,
+                            "already_running": True,
+                        }
 
-            spec = cfg[name]
             cmd = self._resolve_command(spec.get("command", []))
             if not cmd:
                 raise ValueError(f"Servico '{name}' sem comando")
@@ -388,25 +515,77 @@ class ServiceManager:
 
             LOG_DIR.mkdir(parents=True, exist_ok=True)
             log_file = LOG_DIR / f"{name}.log"
-            log_fp = log_file.open("a", encoding="utf-8")
-
-            interactive = self._is_interactive_service(spec)
             creationflags = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
 
-            proc = subprocess.Popen(
-                cmd,
-                cwd=str(cwd),
-                env=env,
-                stdout=log_fp,
-                stderr=subprocess.STDOUT,
-                stdin=subprocess.PIPE if interactive else subprocess.DEVNULL,
-                text=True,
-                bufsize=1,
-                creationflags=creationflags,
-            )
-            log_fp.close()
+            proc = None
+            runtime_info = {
+                "proc": None,
+                "interactive": interactive,
+                "pty_master_fd": None,
+                "stdin": None,
+                "reader_thread": None,
+                "output_chunks": deque(maxlen=TERMINAL_BUFFER_MAX_CHUNKS),
+            }
 
-            self.runtime_processes[name] = proc
+            if interactive and os.name != "nt" and pty is not None:
+                master_fd, slave_fd = pty.openpty()
+                try:
+                    proc = subprocess.Popen(
+                        cmd,
+                        cwd=str(cwd),
+                        env=env,
+                        stdin=slave_fd,
+                        stdout=slave_fd,
+                        stderr=slave_fd,
+                        start_new_session=True,
+                    )
+                finally:
+                    try:
+                        os.close(slave_fd)
+                    except OSError:
+                        pass
+
+                runtime_info["proc"] = proc
+                runtime_info["pty_master_fd"] = master_fd
+                self.runtime_processes[name] = runtime_info
+                runtime_info["reader_thread"] = self._start_pty_reader(name, master_fd, log_file)
+
+            elif interactive:
+                proc = subprocess.Popen(
+                    cmd,
+                    cwd=str(cwd),
+                    env=env,
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1,
+                    creationflags=creationflags,
+                )
+
+                runtime_info["proc"] = proc
+                runtime_info["stdin"] = proc.stdin
+                self.runtime_processes[name] = runtime_info
+                runtime_info["reader_thread"] = self._start_pipe_reader(name, proc, log_file)
+
+            else:
+                log_fp = log_file.open("a", encoding="utf-8")
+                try:
+                    proc = subprocess.Popen(
+                        cmd,
+                        cwd=str(cwd),
+                        env=env,
+                        stdout=log_fp,
+                        stderr=subprocess.STDOUT,
+                        stdin=subprocess.DEVNULL,
+                        creationflags=creationflags,
+                    )
+                finally:
+                    log_fp.close()
+
+                runtime_info["proc"] = proc
+                self.runtime_processes[name] = runtime_info
+
             state.setdefault("services", {})[name] = {
                 "pid": proc.pid,
                 "started_at": now_iso(),
@@ -415,7 +594,14 @@ class ServiceManager:
                 "cwd": str(cwd),
             }
             self._save_state(state)
-            return {"name": name, "running": True, "pid": proc.pid, "already_running": False}
+
+            return {
+                "name": name,
+                "running": True,
+                "pid": proc.pid,
+                "already_running": False,
+                "interactive": interactive,
+            }
 
     def stop_service(self, name: str):
         with self.lock:
@@ -424,34 +610,9 @@ class ServiceManager:
             if not item:
                 return {"name": name, "running": False, "stopped": False, "reason": "not running"}
 
-            runtime_proc = self.runtime_processes.pop(name, None)
             pid = int(item.get("pid", 0) or 0)
-            if pid <= 0:
-                state["services"].pop(name, None)
-                self._save_state(state)
-                return {"name": name, "running": False, "stopped": False, "reason": "invalid pid"}
-
-            if os.name == "nt":
-                subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], check=False)
-            else:
-                try:
-                    os.kill(pid, signal.SIGTERM)
-                except ProcessLookupError:
-                    pass
-                deadline = time.time() + 5
-                while time.time() < deadline and is_pid_running(pid):
-                    time.sleep(0.2)
-                if is_pid_running(pid):
-                    try:
-                        os.kill(pid, signal.SIGKILL)
-                    except ProcessLookupError:
-                        pass
-
-            if runtime_proc and runtime_proc.stdin:
-                try:
-                    runtime_proc.stdin.close()
-                except Exception:
-                    pass
+            self._terminate_pid(pid)
+            self._teardown_runtime(name)
 
             state["services"].pop(name, None)
             self._save_state(state)
@@ -470,27 +631,22 @@ class ServiceManager:
             self._cleanup(state)
             self._save_state(state)
 
-            proc = self.runtime_processes.get(name)
-            if not proc:
+            info = self.runtime_processes.get(name)
+            if not info:
                 return {
                     "name": name,
                     "running": False,
                     "accepted": False,
-                    "reason": "stdin indisponivel; reinicie o servico por este painel",
+                    "reason": "terminal indisponivel; reinicie o servico por este painel",
                 }
-            if proc.poll() is not None:
+
+            proc = info.get("proc")
+            if not proc or proc.poll() is not None:
                 return {
                     "name": name,
                     "running": False,
                     "accepted": False,
                     "reason": "servico parado",
-                }
-            if not proc.stdin:
-                return {
-                    "name": name,
-                    "running": True,
-                    "accepted": False,
-                    "reason": "stdin nao disponivel",
                 }
 
             clean = (input_text or "").replace("\x00", "")
@@ -499,16 +655,36 @@ class ServiceManager:
             if len(encoded) > MAX_STDIN_INPUT_BYTES:
                 raise ValueError("entrada excede limite")
 
-            try:
-                proc.stdin.write(payload)
-                proc.stdin.flush()
-            except Exception:
-                return {
-                    "name": name,
-                    "running": False,
-                    "accepted": False,
-                    "reason": "falha ao escrever no processo",
-                }
+            pty_master_fd = info.get("pty_master_fd")
+            if isinstance(pty_master_fd, int):
+                try:
+                    os.write(pty_master_fd, encoded)
+                except OSError:
+                    return {
+                        "name": name,
+                        "running": False,
+                        "accepted": False,
+                        "reason": "falha ao escrever no terminal",
+                    }
+            else:
+                stdin_obj = info.get("stdin")
+                if not stdin_obj:
+                    return {
+                        "name": name,
+                        "running": True,
+                        "accepted": False,
+                        "reason": "stdin nao disponivel",
+                    }
+                try:
+                    stdin_obj.write(payload)
+                    stdin_obj.flush()
+                except Exception:
+                    return {
+                        "name": name,
+                        "running": False,
+                        "accepted": False,
+                        "reason": "falha ao escrever no processo",
+                    }
 
             return {
                 "name": name,
@@ -516,6 +692,25 @@ class ServiceManager:
                 "accepted": True,
                 "sent_bytes": len(encoded),
             }
+
+    def read_terminal_output(self, name: str, max_chars: int = 12000) -> str:
+        max_chars = max(256, min(max_chars, TERMINAL_RESPONSE_MAX_CHARS))
+
+        with self.lock:
+            info = self.runtime_processes.get(name)
+            text = ""
+            if info:
+                chunks = info.get("output_chunks")
+                if isinstance(chunks, deque):
+                    text = "".join(chunks)
+
+        if not text:
+            text = self.read_logs(name, 200)
+
+        if len(text) > max_chars:
+            text = text[-max_chars:]
+
+        return text
 
     def _safe_log_path(self, path_value: str):
         try:
@@ -733,6 +928,37 @@ def make_handler(manager: ServiceManager):
                     if not require_auth(self, query, scope="services:list"):
                         return
                     return json_response(self, 200, {"services": manager.list_services()})
+
+                if parsed.path.startswith("/api/terminal/"):
+                    if not require_auth(self, query, scope="terminal:read"):
+                        return
+
+                    allowed, retry_after = enforce_rate_limit(
+                        self,
+                        "terminal:read",
+                        LOGS_RATE_LIMIT_MAX,
+                        API_RATE_LIMIT_WINDOW_SECONDS,
+                    )
+                    if not allowed:
+                        return json_response(
+                            self,
+                            429,
+                            {"error": "muitas requisicoes"},
+                            extra_headers={"Retry-After": str(retry_after)},
+                        )
+
+                    raw_name = parsed.path.split("/api/terminal/", 1)[1]
+                    name = clean_service_name(raw_name)
+                    if not name:
+                        return json_response(self, 400, {"error": "nome de servico invalido"})
+
+                    try:
+                        chars = int((query.get("chars", ["12000"])[0] or "12000"))
+                    except ValueError:
+                        chars = 12000
+
+                    output = manager.read_terminal_output(name, chars)
+                    return json_response(self, 200, {"name": name, "output": output})
 
                 if parsed.path.startswith("/api/logs/"):
                     if not require_auth(self, query, scope="logs:read"):
@@ -959,6 +1185,12 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+
+
+
 
 
 

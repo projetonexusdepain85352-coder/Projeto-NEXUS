@@ -10,6 +10,8 @@ can_connect() {
 # Prefer Docker's stable alias only if it is reachable from this WSL session.
 if [[ -n "${NEXUS_COPY_HOST:-}" ]]; then
   COPY_HOST="$NEXUS_COPY_HOST"
+elif can_connect 127.0.0.1 5433; then
+  COPY_HOST="127.0.0.1"
 elif getent hosts host.docker.internal >/dev/null 2>&1 && can_connect host.docker.internal 5433; then
   COPY_HOST="host.docker.internal"
 else
@@ -32,3 +34,4 @@ echo "  POSTGRES_DB=$POSTGRES_DB"
 echo "  POSTGRES_USER=$POSTGRES_USER"
 echo "  QDRANT_URL=$QDRANT_URL"
 echo "  NEXUS_ENV=$NEXUS_ENV"
+

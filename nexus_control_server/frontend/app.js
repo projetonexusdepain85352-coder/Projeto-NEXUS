@@ -153,7 +153,7 @@ function showDashboard(email) {
     if (authToken) {
       refreshTerminalOutput(true);
     }
-  }, 2500);
+  }, 1500);
 }
 
 async function logout() {
@@ -167,7 +167,7 @@ async function logout() {
       });
     }
   } catch (_) {
-    // no-op
+    // ignore
   }
 
   stopDashboardTimers();
@@ -204,14 +204,11 @@ async function refreshServices() {
     servicesByName = new Map(services.map((s) => [s.name, s]));
 
     const tbody = document.getElementById('svc-tbody');
-    const prevLogs = document.getElementById('logs-service').value;
     const prevTerm = document.getElementById('term-service').value;
-
     tbody.innerHTML = '';
 
     if (!services.length) {
       tbody.innerHTML = '<tr><td colspan="5"><div class="empty-state"><div class="icon">◌</div>Nenhum servico configurado</div></td></tr>';
-      syncSelectOptions('logs-service', [], prevLogs);
       syncSelectOptions('term-service', [], prevTerm);
       onTerminalServiceChange();
       return;
@@ -225,7 +222,7 @@ async function refreshServices() {
 
       const tags = [];
       if (s.interactive) {
-        tags.push(s.stdin_available ? '[stdin: OK]' : '[stdin: reinicie]');
+        tags.push(s.stdin_available ? '[tty: conectado]' : '[tty: reinicie]');
       }
 
       tr.innerHTML =
@@ -240,8 +237,8 @@ async function refreshServices() {
       tbody.appendChild(tr);
     });
 
-    syncSelectOptions('logs-service', services, prevLogs);
-    syncSelectOptions('term-service', services, prevTerm);
+    const interactiveServices = services.filter((s) => s.interactive);
+    syncSelectOptions('term-service', interactiveServices, prevTerm);
     onTerminalServiceChange();
   } catch (e) {
     toast(e.message, true);
@@ -250,10 +247,14 @@ async function refreshServices() {
 
 async function startSvc(name) {
   try {
-    await api('/api/services/' + encodeURIComponent(name) + '/start', { method: 'POST' });
-    toast('Servico iniciado: ' + name);
+    const res = await api('/api/services/' + encodeURIComponent(name) + '/start', { method: 'POST' });
+    if (res.already_running) {
+      toast('Servico ja estava em execucao: ' + name);
+    } else {
+      toast('Servico iniciado: ' + name);
+    }
     await refreshServices();
-    refreshTerminalOutput(true);
+    await refreshTerminalOutput(true);
   } catch (e) {
     toast(e.message, true);
   }
@@ -264,28 +265,9 @@ async function stopSvc(name) {
     await api('/api/services/' + encodeURIComponent(name) + '/stop', { method: 'POST' });
     toast('Servico encerrado: ' + name);
     await refreshServices();
-    refreshTerminalOutput(true);
+    await refreshTerminalOutput(true);
   } catch (e) {
     toast(e.message, true);
-  }
-}
-
-async function loadLogs() {
-  const name = document.getElementById('logs-service').value;
-  const lines = document.getElementById('logs-lines').value || 200;
-  if (!name) {
-    return;
-  }
-
-  const box = document.getElementById('logs-output');
-  box.textContent = 'Carregando...';
-
-  try {
-    const data = await api('/api/logs/' + encodeURIComponent(name) + '?lines=' + encodeURIComponent(lines));
-    box.textContent = data.logs || '(sem logs)';
-    box.scrollTop = box.scrollHeight;
-  } catch (e) {
-    box.textContent = 'Erro: ' + e.message;
   }
 }
 
@@ -299,25 +281,20 @@ function onTerminalServiceChange() {
   if (!name || !meta) {
     send.disabled = true;
     input.disabled = true;
-    hint.textContent = 'Selecione um servico interativo para enviar comandos.';
-    return;
-  }
-
-  if (!meta.interactive) {
-    send.disabled = true;
-    input.disabled = true;
-    hint.textContent = 'Este servico nao e interativo (stdin desabilitado).';
+    hint.textContent = 'Nenhum servico interativo disponivel.';
+    document.getElementById('term-output').textContent = '(sem sessão)';
     return;
   }
 
   send.disabled = false;
   input.disabled = false;
-  if (!meta.stdin_available) {
-    hint.textContent = 'Servico interativo sem canal stdin ativo. Reinicie pelo painel para habilitar entrada.';
-  } else if (!meta.running) {
-    hint.textContent = 'Servico parado. Clique em Start para enviar comandos.';
+
+  if (!meta.running) {
+    hint.textContent = 'Servico parado. Clique em Start para abrir a sessao de terminal.';
+  } else if (!meta.stdin_available) {
+    hint.textContent = 'Servico ativo sem canal TTY vinculado. Clique em Stop e Start para reconectar.';
   } else {
-    hint.textContent = 'Canal interativo pronto. Envie comandos ou use atalhos.';
+    hint.textContent = 'Sessao remota ativa. Voce pode enviar comandos e teclas de interação.';
   }
 
   refreshTerminalOutput(true);
@@ -337,7 +314,7 @@ async function sendTerminalPayload(payload, appendNewline) {
     });
 
     if (res.accepted) {
-      toast('Comando enviado para ' + name);
+      toast('Entrada enviada para ' + name);
     } else {
       toast(res.reason || 'Entrada nao aceita', true);
     }
@@ -370,21 +347,21 @@ async function sendTermShortcut(cmd) {
 
 async function refreshTerminalOutput(silent = false) {
   const name = document.getElementById('term-service').value;
-  const lines = document.getElementById('term-lines').value || 120;
+  const chars = document.getElementById('term-chars').value || 12000;
   const box = document.getElementById('term-output');
 
   if (!name) {
-    box.textContent = '(selecione um servico)';
+    box.textContent = '(sem sessão)';
     return;
   }
 
   if (!silent) {
-    box.textContent = 'Carregando...';
+    box.textContent = 'Carregando terminal...';
   }
 
   try {
-    const data = await api('/api/logs/' + encodeURIComponent(name) + '?lines=' + encodeURIComponent(lines));
-    box.textContent = data.logs || '(sem saida)';
+    const data = await api('/api/terminal/' + encodeURIComponent(name) + '?chars=' + encodeURIComponent(chars));
+    box.textContent = data.output || '(sem saída)';
     box.scrollTop = box.scrollHeight;
   } catch (e) {
     box.textContent = 'Erro: ' + e.message;

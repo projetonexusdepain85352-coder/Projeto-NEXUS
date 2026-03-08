@@ -8,9 +8,9 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// MODO DE SUGESTÃO
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// MODO DE SUGESTÃƒO
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 #[derive(PartialEq, Clone)]
 enum ModoSugestao {
     Desligado,
@@ -26,18 +26,18 @@ impl ModoSugestao {
         }
     }
 }
-// ─────────────────────────────────────────────────────────────────────────────
-// CONFIGURAÇÕES AVANÇADAS
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// CONFIGURAÃ‡Ã•ES AVANÃ‡ADAS
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const CONFIG_FILE: &str = "nexus_config.json";
 
 struct Config {
-    threshold_ia: u8,         // confiança mínima para auto-aprovar (padrão 80)
-    threshold_heuristica: u8, // abaixo disso pede decisão manual (padrão 60)
-    timeout_ollama: u64,      // segundos antes de desistir (padrão 30)
-    tamanho_lote: i64,        // documentos por busca (padrão 50)
-    linhas_preview: usize,    // linhas exibidas na tela (padrão 30)
+    threshold_ia: u8,         // confianÃ§a mÃ­nima para auto-aprovar (padrÃ£o 80)
+    threshold_heuristica: u8, // abaixo disso pede decisÃ£o manual (padrÃ£o 60)
+    timeout_ollama: u64,      // segundos antes de desistir (padrÃ£o 30)
+    tamanho_lote: i64,        // documentos por busca (padrÃ£o 50)
+    linhas_preview: usize,    // linhas exibidas na tela (padrÃ£o 30)
 }
 
 impl Default for Config {
@@ -130,8 +130,8 @@ fn revalidar_ia(client: &mut Client, config: &Config, stdin: &io::Stdin) {
     let mut n_incerto = 0usize;
     let mut pulados_retry: Vec<(String, String, String, String)> = Vec::new();
 
-    // Thread ÚNICO de stdin para toda a função — elimina race condition
-    // O mesmo canal serve para: x no loop principal, x no retry, decisões manuais
+    // Thread ÃšNICO de stdin para toda a funÃ§Ã£o â€” elimina race condition
+    // O mesmo canal serve para: x no loop principal, x no retry, decisÃµes manuais
     let parar = Arc::new(AtomicBool::new(false));
     let (tx_stdin, rx_stdin) = std::sync::mpsc::channel::<String>();
     let parar_t = Arc::clone(&parar);
@@ -152,7 +152,7 @@ fn revalidar_ia(client: &mut Client, config: &Config, stdin: &io::Stdin) {
     println!("  [x+Enter] para interromper.");
     println!();
 
-    // ── Loop principal ────────────────────────────────────────────────────────
+    // â”€â”€ Loop principal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     for (i, row) in rows.iter().enumerate() {
         if parar.load(Ordering::Relaxed) {
             println!("  Interrompido pelo usuario.");
@@ -225,7 +225,7 @@ fn revalidar_ia(client: &mut Client, config: &Config, stdin: &io::Stdin) {
                 exibir_resultado_revalidar(&s, &heur);
 
                 if heur.confianca < config.threshold_heuristica {
-                    // Heurística baixa — pede decisão manual por 30s
+                    // HeurÃ­stica baixa â€” pede decisÃ£o manual por 30s
                     let util_ia = s.categoria == Categoria::Util;
                     let sugestao_tmp = Sugestao {
                         categoria: if util_ia {
@@ -239,7 +239,7 @@ fn revalidar_ia(client: &mut Client, config: &Config, stdin: &io::Stdin) {
                     exibir_sugestao(&sugestao_tmp);
                     loop {
                         print!(
-                            "  [HEU] Heuristica baixa ({}%) — sua decisao em 30s [a/r/u/?/i] ou pula: ",
+                            "  [HEU] Heuristica baixa ({}%) â€” sua decisao em 30s [a/r/u/?/i] ou pula: ",
                             heur.confianca
                         );
                         io::stdout().flush().ok();
@@ -300,7 +300,7 @@ fn revalidar_ia(client: &mut Client, config: &Config, stdin: &io::Stdin) {
                                 break;
                             }
                             _ => {
-                                println!("  -> Sem resposta — pulando.");
+                                println!("  -> Sem resposta â€” pulando.");
                                 n_incerto += 1;
                                 break;
                             }
@@ -331,7 +331,7 @@ fn revalidar_ia(client: &mut Client, config: &Config, stdin: &io::Stdin) {
                         });
                     std::thread::sleep(std::time::Duration::from_millis(400));
                 } else {
-                    // Confiança IA baixa — mantido/incerto
+                    // ConfianÃ§a IA baixa â€” mantido/incerto
                     n_incerto += 1;
                     std::thread::sleep(std::time::Duration::from_millis(400));
                 }
@@ -339,7 +339,7 @@ fn revalidar_ia(client: &mut Client, config: &Config, stdin: &io::Stdin) {
         }
     }
 
-    // ── RETRY: docs sem resposta ──────────────────────────────────────────────
+    // â”€â”€ RETRY: docs sem resposta â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if !pulados_retry.is_empty() && !parar.load(Ordering::Relaxed) {
         println!();
         print!(
@@ -435,7 +435,7 @@ fn revalidar_ia(client: &mut Client, config: &Config, stdin: &io::Stdin) {
                         exibir_sugestao(&sugestao_tmp);
                         loop {
                             print!(
-                                "  [HEU] Heuristica baixa ({}%) — sua decisao em 30s [a/r/u/?/i] ou pula: ",
+                                "  [HEU] Heuristica baixa ({}%) â€” sua decisao em 30s [a/r/u/?/i] ou pula: ",
                                 heur.confianca
                             );
                             io::stdout().flush().ok();
@@ -480,7 +480,7 @@ fn revalidar_ia(client: &mut Client, config: &Config, stdin: &io::Stdin) {
                                     break;
                                 }
                                 _ => {
-                                    println!("  -> Sem resposta — voltara depois.");
+                                    println!("  -> Sem resposta â€” voltara depois.");
                                     fila_manual.push((
                                         r_id.clone(),
                                         r_source.clone(),
@@ -519,13 +519,13 @@ fn revalidar_ia(client: &mut Client, config: &Config, stdin: &io::Stdin) {
                             });
                     }
                     Some(s) => {
-                        println!(" confianca baixa ({}%) — mantido", s.confianca);
+                        println!(" confianca baixa ({}%) â€” mantido", s.confianca);
                         n_incerto += 1;
                     }
                 }
             }
 
-            // ── loop manual ───────────────────────────────────────────────
+            // â”€â”€ loop manual â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             while !fila_manual.is_empty() && !parar.load(Ordering::Relaxed) {
                 println!();
                 println!(
@@ -606,7 +606,7 @@ fn revalidar_ia(client: &mut Client, config: &Config, stdin: &io::Stdin) {
                             println!("  -> Rejeitado.");
                         }
                         _ => {
-                            println!("  -> Sem resposta — proxima rodada.");
+                            println!("  -> Sem resposta â€” proxima rodada.");
                         }
                     }
                 }
@@ -625,7 +625,7 @@ fn revalidar_ia(client: &mut Client, config: &Config, stdin: &io::Stdin) {
     println!("    Mantidos/incerto : {}", n_incerto);
     print!("  [Enter] para fechar: ");
     io::stdout().flush().ok();
-    // Usa o canal para não competir com o thread de stdin ainda ativo
+    // Usa o canal para nÃ£o competir com o thread de stdin ainda ativo
     rx_stdin
         .recv_timeout(std::time::Duration::from_secs(300))
         .ok();
@@ -635,16 +635,16 @@ fn config_tui(config: &mut Config, client: &mut Client, stdin: &io::Stdin) {
     loop {
         print!("[2J[1;1H");
         io::stdout().flush().ok();
-        println!("╔══════════════════════════════════════════════════════════════╗");
-        println!("║  NEXUS — CONFIGURAÇÕES AVANÇADAS                             ║");
-        println!("╚══════════════════════════════════════════════════════════════╝");
+        println!("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—");
+        println!("â•‘  NEXUS â€” CONFIGURAÃ‡Ã•ES AVANÃ‡ADAS                             â•‘");
+        println!("â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
         println!();
         println!(
             "  [1] Threshold IA (auto-aprovar)  : {}%",
             config.threshold_ia
         );
         println!(
-            "  [2] Threshold Heurística (manual): {}%",
+            "  [2] Threshold HeurÃ­stica (manual): {}%",
             config.threshold_heuristica
         );
         println!(
@@ -662,9 +662,9 @@ fn config_tui(config: &mut Config, client: &mut Client, stdin: &io::Stdin) {
         println!();
         println!("  [ria] Revalidar auto IA  : roda Ollama em todos os docs validados por IA");
         println!();
-        println!("  [r] Restaurar padrões  [s] Salvar e sair  [q] Sair sem salvar");
+        println!("  [r] Restaurar padrÃµes  [s] Salvar e sair  [q] Sair sem salvar");
         println!();
-        print!("  Opção: ");
+        print!("  OpÃ§Ã£o: ");
         io::stdout().flush().ok();
 
         let cmd = {
@@ -693,7 +693,7 @@ fn config_tui(config: &mut Config, client: &mut Client, stdin: &io::Stdin) {
             }
             "2" => {
                 print!(
-                    "  Threshold Heurística [atual: {}%] novo valor (20-90): ",
+                    "  Threshold HeurÃ­stica [atual: {}%] novo valor (20-90): ",
                     config.threshold_heuristica
                 );
                 io::stdout().flush().ok();
@@ -764,12 +764,12 @@ fn config_tui(config: &mut Config, client: &mut Client, stdin: &io::Stdin) {
             }
             "r" => {
                 *config = Config::default();
-                println!("  Padrões restaurados.");
+                println!("  PadrÃµes restaurados.");
                 std::thread::sleep(std::time::Duration::from_millis(600));
             }
             "s" => {
                 salvar_config(config);
-                println!("  Configurações salvas.");
+                println!("  ConfiguraÃ§Ãµes salvas.");
                 std::thread::sleep(std::time::Duration::from_millis(600));
                 break;
             }
@@ -782,9 +782,9 @@ fn config_tui(config: &mut Config, client: &mut Client, stdin: &io::Stdin) {
 const SESSION_FILE: &str = "nexus_session.txt";
 const SESSION_STATE_FILE: &str = "nexus_session_state.json";
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // ESTRUTURAS DE DADOS
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 struct Documento {
     id: String,
@@ -829,9 +829,9 @@ struct Sugestao {
     motivo: String,
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PERSISTÊNCIA DE SESSÃO (TXT — pulados)
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// PERSISTÃŠNCIA DE SESSÃƒO (TXT â€” pulados)
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 fn carregar_sessao() -> HashSet<String> {
     let mut ids = HashSet::new();
@@ -851,8 +851,8 @@ fn salvar_pulado_sessao(id: &str) {
         .create(true)
         .append(true)
         .open(SESSION_FILE)
-        .expect("Erro ao abrir arquivo de sessão de pulados");
-    writeln!(file, "{}", id).expect("Erro ao salvar ID pulado na sessão");
+        .expect("Erro ao abrir arquivo de sessÃ£o de pulados");
+    writeln!(file, "{}", id).expect("Erro ao salvar ID pulado na sessÃ£o");
 }
 
 fn reescrever_pulados_sessao(pulados: &HashSet<String>) {
@@ -863,7 +863,7 @@ fn reescrever_pulados_sessao(pulados: &HashSet<String>) {
         format!("{}\n", conteudo)
     };
     fs::write(SESSION_FILE, com_newline)
-        .unwrap_or_else(|e| eprintln!("[AVISO] Erro ao reescrever sessão: {}", e));
+        .unwrap_or_else(|e| eprintln!("[AVISO] Erro ao reescrever sessÃ£o: {}", e));
 }
 
 fn limpar_sessao() {
@@ -871,9 +871,9 @@ fn limpar_sessao() {
     let _ = fs::remove_file(SESSION_STATE_FILE);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PERSISTÊNCIA DE ESTADO COMPLETO (JSON — aprovados, rejeitados, etc.)
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// PERSISTÃŠNCIA DE ESTADO COMPLETO (JSON â€” aprovados, rejeitados, etc.)
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 fn salvar_estado_sessao(estado: &EstadoSessao) {
     let ultimo = match &estado.ultimo_documento_id {
@@ -885,11 +885,11 @@ fn salvar_estado_sessao(estado: &EstadoSessao) {
         estado.started_at, estado.aprovados, estado.rejeitados, estado.pulados, ultimo
     );
     fs::write(SESSION_STATE_FILE, json)
-        .unwrap_or_else(|e| eprintln!("[AVISO] Erro ao salvar estado da sessão: {}", e));
+        .unwrap_or_else(|e| eprintln!("[AVISO] Erro ao salvar estado da sessÃ£o: {}", e));
 }
 
 /// Extrai o valor de uma chave no JSON simples gerado por `salvar_estado_sessao`.
-/// Retorna None se a chave não existir ou o valor for `null`.
+/// Retorna None se a chave nÃ£o existir ou o valor for `null`.
 fn extrair_json_valor<'a>(conteudo: &'a str, chave: &str) -> Option<&'a str> {
     let prefixo = format!("\"{}\":", chave);
     for linha in conteudo.lines() {
@@ -932,9 +932,9 @@ fn carregar_estado_sessao() -> Option<EstadoSessao> {
     })
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // BANCO DE DADOS
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 fn contar_pendentes(client: &mut Client, pulados: &HashSet<String>) -> i64 {
     let excluidos: Vec<&str> = pulados.iter().map(|s| s.as_str()).collect();
@@ -963,7 +963,7 @@ fn contar_pendentes(client: &mut Client, pulados: &HashSet<String>) -> i64 {
 }
 
 /// Busca o lote de documentos.
-/// O preview é extraído de até 4000 chars do conteúdo e então filtrado via
+/// O preview Ã© extraÃ­do de atÃ© 4000 chars do conteÃºdo e entÃ£o filtrado via
 /// `filtrar_preview`, que descarta linhas curtas e duplicadas.
 fn buscar_lote(
     client: &mut Client,
@@ -1022,7 +1022,7 @@ fn buscar_conteudo_completo(client: &mut Client, id: &str) -> String {
              FROM documents WHERE id::text = $1",
             &[&id],
         )
-        .expect("Erro ao buscar conteúdo completo");
+        .expect("Erro ao buscar conteÃºdo completo");
     row.get::<_, String>(0)
 }
 
@@ -1055,7 +1055,7 @@ fn db_desfazer(client: &mut Client, id: &str) {
              WHERE document_id::text = $1",
             &[&id],
         )
-        .expect("Erro ao desfazer decisão");
+        .expect("Erro ao desfazer decisÃ£o");
 }
 
 fn contar_por_dominio(client: &mut Client) -> Vec<(String, i64, i64, i64)> {
@@ -1071,21 +1071,21 @@ fn contar_por_dominio(client: &mut Client) -> Vec<(String, i64, i64, i64)> {
              ORDER BY d.domain",
             &[],
         )
-        .expect("Erro ao contar por domínio");
+        .expect("Erro ao contar por domÃ­nio");
     rows.iter()
         .map(|r| (r.get(0), r.get(1), r.get(2), r.get(3)))
         .collect()
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // FILTRO DE PREVIEW
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-/// Recebe o conteúdo bruto (até 4 000 chars) e retorna até 800 chars de
-/// conteúdo de qualidade:
+/// Recebe o conteÃºdo bruto (atÃ© 4 000 chars) e retorna atÃ© 800 chars de
+/// conteÃºdo de qualidade:
 /// - Pula linhas com menos de 30 chars (links, itens de menu, etc.)
 /// - Pula linhas duplicadas
-/// - Acumula até 800 chars (contando codepoints para consistência com a TUI)
+/// - Acumula atÃ© 800 chars (contando codepoints para consistÃªncia com a TUI)
 ///
 /// Fallback: se o filtro produzir menos de 100 chars, retorna os primeiros
 /// 800 chars sem filtro (documentos muito curtos ou todo em linhas pequenas).
@@ -1116,9 +1116,9 @@ fn filtrar_preview(conteudo: &str) -> String {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// INTERFACE — UTILIDADES
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// INTERFACE â€” UTILIDADES
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 fn limpar_tela() {
     print!("\x1B[2J\x1B[1;1H");
@@ -1134,36 +1134,36 @@ fn ler_linha(stdin: &io::Stdin) -> String {
     buf.trim().to_lowercase()
 }
 
-/// Conta codepoints Unicode — não bytes. Resolve o desalinhamento causado por
-/// símbolos multi-byte (✓ ✗ ~) no cálculo de padding do header.
-/// Nota: não é perfeito para caracteres CJK de largura dupla, mas cobre
-/// inteiramente os símbolos usados neste programa.
+/// Conta codepoints Unicode â€” nÃ£o bytes. Resolve o desalinhamento causado por
+/// sÃ­mbolos multi-byte (âœ“ âœ— ~) no cÃ¡lculo de padding do header.
+/// Nota: nÃ£o Ã© perfeito para caracteres CJK de largura dupla, mas cobre
+/// inteiramente os sÃ­mbolos usados neste programa.
 fn largura_visual(s: &str) -> usize {
     s.chars().count()
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// INTERFACE — EXIBIÇÃO
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// INTERFACE â€” EXIBIÃ‡ÃƒO
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 fn exibir_ajuda() {
     println!();
-    println!("  ┌─────────────────────────────────────────────────┐");
-    println!("  │  COMANDOS                                        │");
-    println!("  │                                                  │");
-    println!("  │  [a] Aprovar                                     │");
-    println!("  │  [r] Rejeitar  (pede motivo)                     │");
-    println!("  │  [u] Inútil    (rejeição rápida, sem digitar)    │");
-    println!("  │  [p] Pular     (deixa como pendente, lembra)     │");
-    println!("  │  [v] Voltar    (desfaz última decisão)           │");
-    println!("  │  [?] Ver mais  (exibe conteúdo completo paginado)│");
-    println!("  │  [i] Sugestão  (análise do documento atual)      │");
-    println!("  │  [h] Heurística (on/off sugestão heurística)     │");
-    println!("  │  [t] Auto-IA   (liga/desliga IA automática)      │");
-    println!("  │  [e] Estatísticas da sessão                      │");
-    println!("  │  [s] Salvar e sair                               │");
-    println!("  │  [q] Sair      (descarta pulados da sessão)      │");
-    println!("  └──────────────────────────────────────────────────┘");
+    println!("  â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”");
+    println!("  â”‚  COMANDOS                                        â”‚");
+    println!("  â”‚                                                  â”‚");
+    println!("  â”‚  [a] Aprovar                                     â”‚");
+    println!("  â”‚  [r] Rejeitar  (pede motivo)                     â”‚");
+    println!("  â”‚  [u] InÃºtil    (rejeiÃ§Ã£o rÃ¡pida, sem digitar)    â”‚");
+    println!("  â”‚  [p] Pular     (deixa como pendente, lembra)     â”‚");
+    println!("  â”‚  [v] Voltar    (desfaz Ãºltima decisÃ£o)           â”‚");
+    println!("  â”‚  [?] Ver mais  (exibe conteÃºdo completo paginado)â”‚");
+    println!("  â”‚  [i] SugestÃ£o  (anÃ¡lise do documento atual)      â”‚");
+    println!("  â”‚  [h] HeurÃ­stica (on/off sugestÃ£o heurÃ­stica)     â”‚");
+    println!("  â”‚  [t] Auto-IA   (liga/desliga IA automÃ¡tica)      â”‚");
+    println!("  â”‚  [e] EstatÃ­sticas da sessÃ£o                      â”‚");
+    println!("  â”‚  [s] Salvar e sair                               â”‚");
+    println!("  â”‚  [q] Sair      (descarta pulados da sessÃ£o)      â”‚");
+    println!("  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜");
     println!();
 }
 
@@ -1183,7 +1183,7 @@ fn exibir_documento(
     let progresso_total = aprovados + rejeitados;
     let total_geral = progresso_total as i64 + total_pendentes;
     let conteudo_header = format!(
-        "  Lote: {}/{}   Sessão: ✓{}  ✗{}  ~{}   Total: {}/{}   Modo: {}",
+        "  Lote: {}/{}   SessÃ£o: âœ“{}  âœ—{}  ~{}   Total: {}/{}   Modo: {}",
         idx + 1,
         total_lote,
         aprovados,
@@ -1193,23 +1193,23 @@ fn exibir_documento(
         total_geral,
         modo.label()
     );
-    // Usa largura_visual para não contar bytes dos símbolos Unicode como colunas
+    // Usa largura_visual para nÃ£o contar bytes dos sÃ­mbolos Unicode como colunas
     let padding = 62usize.saturating_sub(largura_visual(&conteudo_header));
 
-    println!("╔══════════════════════════════════════════════════════════════╗");
-    println!("║  NEXUS — VALIDADOR DE DOCUMENTOS                             ║");
-    println!("╠══════════════════════════════════════════════════════════════╣");
-    println!("║{}{}║", conteudo_header, " ".repeat(padding));
-    println!("╚══════════════════════════════════════════════════════════════╝");
+    println!("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—");
+    println!("â•‘  NEXUS â€” VALIDADOR DE DOCUMENTOS                             â•‘");
+    println!("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
+    println!("â•‘{}{}â•‘", conteudo_header, " ".repeat(padding));
+    println!("â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
     println!();
-    println!("  Domínio  : {}", doc.domain);
+    println!("  DomÃ­nio  : {}", doc.domain);
     println!("  Tipo     : {}", doc.doc_type);
     println!("  Tamanho  : {} bytes", doc.content_length);
     println!("  Fonte    : {}", doc.source);
     println!();
-    println!("──────────────────────────────────────────────────────────────");
-    println!("  PRÉVIA DO CONTEÚDO ({} linhas):", linhas);
-    println!("──────────────────────────────────────────────────────────────");
+    println!("â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€");
+    println!("  PRÃ‰VIA DO CONTEÃšDO ({} linhas):", linhas);
+    println!("â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€");
     println!();
 
     for linha in doc.preview.lines().take(linhas) {
@@ -1217,14 +1217,14 @@ fn exibir_documento(
     }
 
     println!();
-    println!("──────────────────────────────────────────────────────────────");
+    println!("â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€");
     println!(
-        "  [a] Aprovar  [r] Rejeitar  [u] Inútil  [p] Pular  [b] Browser  [s] Salvar  [q] Sair"
+        "  [a] Aprovar  [r] Rejeitar  [u] InÃºtil  [p] Pular  [b] Browser  [s] Salvar  [q] Sair"
     );
     println!(
-        "  [i] Sugestão [h] Heurística  [t] Auto-IA  [x] Parar-IA  [v] Voltar  [?] Ver mais  [e] Stats  [z] Config"
+        "  [i] SugestÃ£o [h] HeurÃ­stica  [t] Auto-IA  [x] Parar-IA  [v] Voltar  [?] Ver mais  [e] Stats  [z] Config"
     );
-    println!("──────────────────────────────────────────────────────────────");
+    println!("â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€");
 }
 
 fn quebrar_motivo(texto: &str, largura: usize) -> Vec<String> {
@@ -1250,24 +1250,24 @@ fn quebrar_motivo(texto: &str, largura: usize) -> Vec<String> {
 
 fn exibir_sugestao(s: &Sugestao) {
     let barras = (s.confianca / 10) as usize;
-    let barra = format!("{}{}", "█".repeat(barras), "░".repeat(10 - barras));
+    let barra = format!("{}{}", "â–ˆ".repeat(barras), "â–‘".repeat(10 - barras));
     let linhas_motivo = quebrar_motivo(&s.motivo, 56);
     let (icone, label) = if s.categoria == Categoria::Util {
-        ("✓", "UTIL  ")
+        ("âœ“", "UTIL  ")
     } else {
-        ("✗", "INUTEL")
+        ("âœ—", "INUTEL")
     };
-    println!("  ┌─ SUGESTAO ──────────────────────────────────────────────────┐");
+    println!("  â”Œâ”€ SUGESTAO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”");
     println!(
-        "  │  {} {}   Confianca: {}% [{}]  │",
+        "  â”‚  {} {}   Confianca: {}% [{}]  â”‚",
         icone, label, s.confianca, barra
     );
-    println!("  │                                                              │");
+    println!("  â”‚                                                              â”‚");
     for l in &linhas_motivo {
         let p = 56usize.saturating_sub(largura_visual(l));
-        println!("  │  {}{}  │", l, " ".repeat(p));
+        println!("  â”‚  {}{}  â”‚", l, " ".repeat(p));
     }
-    println!("  └──────────────────────────────────────────────────────────────┘");
+    println!("  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜");
 }
 
 fn exibir_estatisticas(
@@ -1297,38 +1297,38 @@ fn exibir_estatisticas(
     let s_sec = decorrido % 60;
 
     println!();
-    println!("  ┌─ ESTATÍSTICAS DA SESSÃO ──────────────────────────────┐");
+    println!("  â”Œâ”€ ESTATÃSTICAS DA SESSÃƒO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”");
     println!(
-        "  │  Duração:    {:02}:{:02}:{:02}                              │",
+        "  â”‚  DuraÃ§Ã£o:    {:02}:{:02}:{:02}                              â”‚",
         h, m, s_sec
     );
     println!(
-        "  │  Velocidade: {:.1} docs/hora                         │",
+        "  â”‚  Velocidade: {:.1} docs/hora                         â”‚",
         velocidade
     );
     println!(
-        "  │  Restante:   ~{:.0}h (baseado em {} pending)        │",
+        "  â”‚  Restante:   ~{:.0}h (baseado em {} pending)        â”‚",
         restante_horas, total_pending
     );
-    println!("  │                                                      │");
-    println!("  │  DOMÍNIO    PENDING  APROVADO  REJEITADO            │");
+    println!("  â”‚                                                      â”‚");
+    println!("  â”‚  DOMÃNIO    PENDING  APROVADO  REJEITADO            â”‚");
     for (dom, pend, aprov, rejeit) in &dominios {
         println!(
-            "  │  {:<10} {:>6}   {:>7}   {:>8}            │",
+            "  â”‚  {:<10} {:>6}   {:>7}   {:>8}            â”‚",
             dom, pend, aprov, rejeit
         );
     }
-    println!("  └──────────────────────────────────────────────────────┘");
+    println!("  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜");
     println!();
     print!("  [Enter] para fechar: ");
     io::stdout()
         .flush()
-        .expect("Erro ao exibir prompt de fechar estatísticas");
+        .expect("Erro ao exibir prompt de fechar estatÃ­sticas");
     let mut buf = String::new();
     stdin
         .lock()
         .read_line(&mut buf)
-        .expect("Erro ao ler confirmação de estatísticas");
+        .expect("Erro ao ler confirmaÃ§Ã£o de estatÃ­sticas");
 }
 
 fn exibir_conteudo_completo(conteudo: &str, source: &str, stdin: &io::Stdin) {
@@ -1341,7 +1341,7 @@ fn exibir_conteudo_completo(conteudo: &str, source: &str, stdin: &io::Stdin) {
         limpar_tela();
         let fim = (offset + pagina_size).min(total_linhas);
         println!(
-            "══ {} | Linhas {}-{} de {} | [Enter] próx  [b] ant  [q] sair ══",
+            "â•â• {} | Linhas {}-{} de {} | [Enter] prÃ³x  [b] ant  [q] sair â•â•",
             source,
             offset + 1,
             fim,
@@ -1386,19 +1386,19 @@ fn exibir_conteudo_completo_rx(
     loop {
         let fim = (offset + pagina_size).min(total_linhas);
         println!();
-        println!("──────────────────────────────────────────────────────────────");
+        println!("â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€");
         println!(
-            "  {} | Linhas {}-{} de {} | [Enter] próx  [b] ant  [q] sair",
+            "  {} | Linhas {}-{} de {} | [Enter] prÃ³x  [b] ant  [q] sair",
             source,
             offset + 1,
             fim,
             total_linhas
         );
-        println!("──────────────────────────────────────────────────────────────");
+        println!("â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€");
         for linha in &linhas_conteudo[offset..fim] {
             println!("  {}", linha);
         }
-        println!("──────────────────────────────────────────────────────────────");
+        println!("â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€");
         print!("  Comando: ");
         io::stdout().flush().expect("flush paginador_rx");
         let cmd = rx
@@ -1420,9 +1420,9 @@ fn exibir_conteudo_completo_rx(
         }
     }
 }
-// ─────────────────────────────────────────────────────────────────────────────
-// ALGORITMO DE SUGESTÃO
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ALGORITMO DE SUGESTÃƒO
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 fn db_aprovar_ia(client: &mut Client, id: &str) {
     client.execute(
@@ -1540,33 +1540,33 @@ fn sugerir_heuristica_interna(doc: &Documento) -> Sugestao {
     let mut pontos_ruins: i32 = 0;
     let mut motivos_ruins: Vec<String> = Vec::new();
 
-    // ── Assinaturas eliminatórias ─────────────────────────────────────────────
+    // â”€â”€ Assinaturas eliminatÃ³rias â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     let assinaturas_fortes: &[(&str, &str)] = &[
-        ("table of contents\n", "página de TOC puro"),
-        ("your account\ndocumentation\n", "cabeçalho postgresql.org"),
-        ("next page\nprevious page\n", "paginação de navegação"),
-        ("skip to main content\n", "página sem conteúdo real"),
-        ("search results for", "página de resultado de busca"),
+        ("table of contents\n", "pÃ¡gina de TOC puro"),
+        ("your account\ndocumentation\n", "cabeÃ§alho postgresql.org"),
+        ("next page\nprevious page\n", "paginaÃ§Ã£o de navegaÃ§Ã£o"),
+        ("skip to main content\n", "pÃ¡gina sem conteÃºdo real"),
+        ("search results for", "pÃ¡gina de resultado de busca"),
     ];
     for (assinatura, descricao) in assinaturas_fortes {
         if texto.contains(assinatura) {
             return Sugestao {
                 categoria: Categoria::Inutil,
                 confianca: 95,
-                motivo: format!("Eliminatório: {}", descricao),
+                motivo: format!("EliminatÃ³rio: {}", descricao),
             };
         }
     }
 
-    // ── Cabeçalho de idioma ───────────────────────────────────────────────────
+    // â”€â”€ CabeÃ§alho de idioma â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     let tem_cabecalho_idioma =
         texto.contains("chinese (simplified)") || texto.contains("chinese (traditional)");
     if tem_cabecalho_idioma {
         pontos_ruins += 15;
-        motivos_ruins.push("cabeçalho de idioma presente".to_string());
+        motivos_ruins.push("cabeÃ§alho de idioma presente".to_string());
     }
 
-    // ── Linhas curtas ─────────────────────────────────────────────────────────
+    // â”€â”€ Linhas curtas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     let padroes_codigo: &[&str] = &[
         "=", "::", "->", "__", "{}", "()", "[]", "#", "/*", "*/", "//",
     ];
@@ -1585,13 +1585,13 @@ fn sugerir_heuristica_interna(doc: &Documento) -> Sugestao {
         motivos_ruins.push(format!("{}% das linhas < 20 chars", pct_curtas));
     } else if pct_curtas > 55 {
         pontos_ruins += 20;
-        motivos_ruins.push(format!("{}% das linhas são curtas", pct_curtas));
+        motivos_ruins.push(format!("{}% das linhas sÃ£o curtas", pct_curtas));
     }
 
-    // ── Duplicatas ────────────────────────────────────────────────────────────
-    // Distingue duplicatas de navegação (linhas isoladas repetidas, ex: menus)
-    // de artefatos de scraping (blocos consecutivos repetidos, ex: código renderizado 2x).
-    // Apenas duplicatas isoladas são penalizadas — blocos são ignorados.
+    // â”€â”€ Duplicatas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // Distingue duplicatas de navegaÃ§Ã£o (linhas isoladas repetidas, ex: menus)
+    // de artefatos de scraping (blocos consecutivos repetidos, ex: cÃ³digo renderizado 2x).
+    // Apenas duplicatas isoladas sÃ£o penalizadas â€” blocos sÃ£o ignorados.
     let mut vistos: std::collections::HashSet<&str> = std::collections::HashSet::new();
     let mut duplicadas_isoladas = 0usize;
     let mut i_dup = 0usize;
@@ -1607,7 +1607,7 @@ fn sugerir_heuristica_interna(doc: &Documento) -> Sugestao {
                 let ln = linhas[i_dup + 1];
                 ln.len() > 5 && vistos.contains(ln)
             };
-            // Só penaliza se for duplicata isolada (não parte de bloco)
+            // SÃ³ penaliza se for duplicata isolada (nÃ£o parte de bloco)
             if !prev_dup && !next_dup {
                 duplicadas_isoladas += 1;
             }
@@ -1623,7 +1623,7 @@ fn sugerir_heuristica_interna(doc: &Documento) -> Sugestao {
         motivos_ruins.push(format!("{}% de duplicatas de navegacao", pct_dup));
     }
 
-    // ── Detecção de TOC/índice ────────────────────────────────────────────────
+    // â”€â”€ DetecÃ§Ã£o de TOC/Ã­ndice â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     let linhas_lista = linhas
         .iter()
         .filter(|l| {
@@ -1631,7 +1631,7 @@ fn sugerir_heuristica_interna(doc: &Documento) -> Sugestao {
             l.ends_with(|c: char| c.is_ascii_digit())
                 || l.starts_with("- ")
                 || l.starts_with("* ")
-                || l.starts_with("• ")
+                || l.starts_with("â€¢ ")
                 || (l_low == **l
                     && !l.ends_with('.')
                     && !l.ends_with('?')
@@ -1643,12 +1643,12 @@ fn sugerir_heuristica_interna(doc: &Documento) -> Sugestao {
     if pct_lista > 40 && total > 15 {
         pontos_ruins += 30;
         motivos_ruins.push(format!(
-            "{}% das linhas são itens de lista/índice",
+            "{}% das linhas sÃ£o itens de lista/Ã­ndice",
             pct_lista
         ));
     }
 
-    // MELHORIA 1: TOC com padrão numérico inline ──────────────────────────────
+    // MELHORIA 1: TOC com padrÃ£o numÃ©rico inline â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     let mut linhas_toc_inline = 0usize;
     for linha in &linhas {
         let chars: Vec<char> = linha.chars().collect();
@@ -1683,7 +1683,7 @@ fn sugerir_heuristica_interna(doc: &Documento) -> Sugestao {
     }
     let pct_toc_inline = (linhas_toc_inline * 100) / total;
 
-    // Detecta índice de capítulo estilo "35.3. nome" ou "35.3 nome" (postgresql, etc.)
+    // Detecta Ã­ndice de capÃ­tulo estilo "35.3. nome" ou "35.3 nome" (postgresql, etc.)
     let linhas_chapter_idx = linhas
         .iter()
         .filter(|l| {
@@ -1700,14 +1700,14 @@ fn sugerir_heuristica_interna(doc: &Documento) -> Sugestao {
             while i < b.len() && b[i].is_ascii_digit() {
                 i += 1;
             }
-            i > start // tinha dígitos após o ponto
+            i > start // tinha dÃ­gitos apÃ³s o ponto
         })
         .count();
     let pct_chapter_idx = (linhas_chapter_idx * 100) / total;
     if pct_chapter_idx > 30 && total > 5 {
         pontos_ruins += 50;
         motivos_ruins.push(format!(
-            "{}% das linhas com padrão de índice de capítulo (N.N.)",
+            "{}% das linhas com padrÃ£o de Ã­ndice de capÃ­tulo (N.N.)",
             pct_chapter_idx
         ));
     }
@@ -1716,21 +1716,21 @@ fn sugerir_heuristica_interna(doc: &Documento) -> Sugestao {
     if pct_toc_inline > 20 {
         pontos_ruins += 40;
         motivos_ruins.push(format!(
-            "{}% das linhas com padrão numérico de índice",
+            "{}% das linhas com padrÃ£o numÃ©rico de Ã­ndice",
             pct_toc_inline
         ));
     }
 
-    // MELHORIA 3: idioma + TOC → eliminatório ─────────────────────────────────
+    // MELHORIA 3: idioma + TOC â†’ eliminatÃ³rio â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if tem_cabecalho_idioma && sinal_toc_ativo {
         return Sugestao {
             categoria: Categoria::Inutil,
             confianca: 92,
-            motivo: "índice kernel.org com cabeçalho de idioma".to_string(),
+            motivo: "Ã­ndice kernel.org com cabeÃ§alho de idioma".to_string(),
         };
     }
 
-    // MELHORIA 2: Razão título/conteúdo ──────────────────────────────────────
+    // MELHORIA 2: RazÃ£o tÃ­tulo/conteÃºdo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     let linhas_longas = linhas.iter().filter(|l| l.len() > 100).count();
     let padroes_api_pre: &[&str] = &["pub fn", "pub struct", "pub trait", "impl "];
     let linhas_api_pre = linhas
@@ -1741,14 +1741,14 @@ fn sugerir_heuristica_interna(doc: &Documento) -> Sugestao {
     let linhas_curtas_medias = linhas.iter().filter(|l| l.len() < 60).count();
     if linhas_longas < 5 && linhas_curtas_medias > 20 && !sinal_api_ref {
         pontos_ruins += 30;
-        motivos_ruins.push("estrutura de índice: poucos parágrafos, muitos títulos".to_string());
+        motivos_ruins.push("estrutura de Ã­ndice: poucos parÃ¡grafos, muitos tÃ­tulos".to_string());
     }
     if pct_dup > 20 && linhas_longas < 3 && !sinal_api_ref {
         pontos_ruins += 15;
         motivos_ruins.push("estrutura repetitiva com poucas linhas longas".to_string());
     }
 
-    // ── Releases/downloads ────────────────────────────────────────────────────
+    // â”€â”€ Releases/downloads â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     let palavras_release = [
         "download",
         "release",
@@ -1765,10 +1765,10 @@ fn sugerir_heuristica_interna(doc: &Documento) -> Sugestao {
     let pct_release = (linhas_release * 100) / total;
     if pct_release > 30 {
         pontos_ruins += 20;
-        motivos_ruins.push("possível página de releases/downloads".to_string());
+        motivos_ruins.push("possÃ­vel pÃ¡gina de releases/downloads".to_string());
     }
 
-    // ── Tamanho ───────────────────────────────────────────────────────────────
+    // â”€â”€ Tamanho â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if doc.content_length < 800 {
         pontos_ruins += 40;
         motivos_ruins.push(format!("apenas {} bytes", doc.content_length));
@@ -1776,7 +1776,7 @@ fn sugerir_heuristica_interna(doc: &Documento) -> Sugestao {
         pontos_ruins += 10;
     }
 
-    // ── Pontuação ─────────────────────────────────────────────────────────────
+    // â”€â”€ PontuaÃ§Ã£o â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     let chars_total = texto.len().max(1);
     let pontuacao = texto
         .chars()
@@ -1785,10 +1785,10 @@ fn sugerir_heuristica_interna(doc: &Documento) -> Sugestao {
     let pct_pont = (pontuacao * 1000) / chars_total;
     if pct_pont < 2 && total > 20 {
         pontos_ruins += 25;
-        motivos_ruins.push("quase sem pontuação".to_string());
+        motivos_ruins.push("quase sem pontuaÃ§Ã£o".to_string());
     }
 
-    // ── Palavras-chave por domínio ────────────────────────────────────────────
+    // â”€â”€ Palavras-chave por domÃ­nio â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     let palavras_rust: &[&str] = &[
         "fn ",
         "let ",
@@ -1938,7 +1938,7 @@ fn sugerir_heuristica_interna(doc: &Documento) -> Sugestao {
         .collect();
     let n = hits.len();
 
-    // ── Bônus ─────────────────────────────────────────────────────────────────
+    // â”€â”€ BÃ´nus â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     let densidade = (n * 100) / total_palavras;
     let bonus_densidade: i32 = if densidade > 8 {
         25
@@ -1997,7 +1997,7 @@ fn sugerir_heuristica_interna(doc: &Documento) -> Sugestao {
     };
     if bonus_url < 0 {
         pontos_ruins += -bonus_url;
-        motivos_ruins.push("URL indica conteúdo de navegação/índice".to_string());
+        motivos_ruins.push("URL indica conteÃºdo de navegaÃ§Ã£o/Ã­ndice".to_string());
     }
 
     let bonus_tamanho: i32 = if sinal_toc_ativo || pct_lista > 60 {
@@ -2018,7 +2018,7 @@ fn sugerir_heuristica_interna(doc: &Documento) -> Sugestao {
         + bonus_api_ref;
     let score_final = pontos_ruins - bonus_tecnico;
 
-    // ── Decisão ───────────────────────────────────────────────────────────────
+    // â”€â”€ DecisÃ£o â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if n >= 3 && score_final < 30 {
         let exemplos = hits
             .iter()
@@ -2040,7 +2040,7 @@ fn sugerir_heuristica_interna(doc: &Documento) -> Sugestao {
             sufixo.push_str(&format!(" [{} bytes]", doc.content_length));
         }
         if bonus_url > 0 {
-            sufixo.push_str(" [URL técnica]");
+            sufixo.push_str(" [URL tÃ©cnica]");
         }
         return Sugestao {
             categoria: Categoria::Util,
@@ -2058,7 +2058,7 @@ fn sugerir_heuristica_interna(doc: &Documento) -> Sugestao {
 
     if score_final >= 40 {
         let motivo = if motivos_ruins.is_empty() {
-            "sem conteúdo técnico identificável".to_string()
+            "sem conteÃºdo tÃ©cnico identificÃ¡vel".to_string()
         } else {
             motivos_ruins.join("; ")
         };
@@ -2070,7 +2070,7 @@ fn sugerir_heuristica_interna(doc: &Documento) -> Sugestao {
         };
     }
 
-    // ── Zona cinzenta ─────────────────────────────────────────────────────────
+    // â”€â”€ Zona cinzenta â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if n >= 3 {
         let exemplos = hits
             .iter()
@@ -2085,13 +2085,13 @@ fn sugerir_heuristica_interna(doc: &Documento) -> Sugestao {
             sufixo.push_str(&format!(" [{} bytes]", doc.content_length));
         }
         if bonus_url > 0 {
-            sufixo.push_str(" [URL técnica]");
+            sufixo.push_str(" [URL tÃ©cnica]");
         }
         Sugestao {
             categoria: Categoria::Util,
             confianca: 45,
             motivo: format!(
-                "Sinal misto — palavras: {}; problemas: {}{}",
+                "Sinal misto â€” palavras: {}; problemas: {}{}",
                 exemplos,
                 if motivos_ruins.is_empty() {
                     "nenhum".to_string()
@@ -2112,7 +2112,7 @@ fn sugerir_heuristica_interna(doc: &Documento) -> Sugestao {
                 sufixo.push_str(&format!(" [{} bytes]", doc.content_length));
             }
             if bonus_url > 0 {
-                sufixo.push_str(" [URL técnica]");
+                sufixo.push_str(" [URL tÃ©cnica]");
             }
             Sugestao {
                 categoria: Categoria::Util,
@@ -2132,7 +2132,7 @@ fn sugerir_heuristica_interna(doc: &Documento) -> Sugestao {
                 categoria: Categoria::Inutil,
                 confianca: 58,
                 motivo: format!(
-                    "conteúdo insuficiente para classificar com segurança; {}",
+                    "conteÃºdo insuficiente para classificar com seguranÃ§a; {}",
                     if motivos_ruins.is_empty() {
                         "sem problemas estruturais identificados".to_string()
                     } else {
@@ -2158,9 +2158,9 @@ fn sugerir_heuristica_interna(doc: &Documento) -> Sugestao {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // TAXONOMIA E BROWSER
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 struct DocClassificado {
     id: String,
@@ -2626,43 +2626,43 @@ fn gerar_tags_por_url(source: &str, domain: &str, util: bool) -> Vec<String> {
 fn exibir_documento_revalidar(doc: &Documento, idx: usize, total: usize, n_linhas: usize) {
     limpar_tela();
     let conteudo_header = format!(
-        "  Lote: {}/{}   Domínio: {}   Fonte: {:.40}",
+        "  Lote: {}/{}   DomÃ­nio: {}   Fonte: {:.40}",
         idx + 1,
         total,
         doc.domain,
         doc.source
     );
     let padding = 62usize.saturating_sub(largura_visual(&conteudo_header));
-    println!("╔══════════════════════════════════════════════════════════════╗");
-    println!("║  NEXUS — REVALIDADOR IA                                     ║");
-    println!("╠══════════════════════════════════════════════════════════════╣");
-    println!("║{}{}║", conteudo_header, " ".repeat(padding));
-    println!("╚══════════════════════════════════════════════════════════════╝");
+    println!("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—");
+    println!("â•‘  NEXUS â€” REVALIDADOR IA                                     â•‘");
+    println!("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
+    println!("â•‘{}{}â•‘", conteudo_header, " ".repeat(padding));
+    println!("â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
     println!();
-    println!("  Domínio  : {}", doc.domain);
+    println!("  DomÃ­nio  : {}", doc.domain);
     println!("  Tamanho  : {} bytes", doc.content_length);
     println!("  Linhas   : {}", n_linhas);
     println!("  Fonte    : {}", doc.source);
     println!();
-    println!("──────────────────────────────────────────────────────────────");
-    println!("  PRÉVIA DO CONTEÚDO (30 linhas):");
-    println!("──────────────────────────────────────────────────────────────");
+    println!("â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€");
+    println!("  PRÃ‰VIA DO CONTEÃšDO (30 linhas):");
+    println!("â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€");
     println!();
     for linha in doc.preview.lines().take(30) {
         println!("  {}", linha);
     }
     println!();
-    println!("──────────────────────────────────────────────────────────────");
+    println!("â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€");
 }
 
 fn exibir_resultado_revalidar(s: &Sugestao, heur: &Sugestao) {
     let barras_ia = (s.confianca / 10) as usize;
-    let barra_ia = format!("{}{}", "█".repeat(barras_ia), "░".repeat(10 - barras_ia));
+    let barra_ia = format!("{}{}", "â–ˆ".repeat(barras_ia), "â–‘".repeat(10 - barras_ia));
     let barras_heur = (heur.confianca / 10) as usize;
     let barra_heur = format!(
         "{}{}",
-        "█".repeat(barras_heur),
-        "░".repeat(10 - barras_heur)
+        "â–ˆ".repeat(barras_heur),
+        "â–‘".repeat(10 - barras_heur)
     );
 
     let label_ia = if s.categoria == Categoria::Util {
@@ -2683,22 +2683,22 @@ fn exibir_resultado_revalidar(s: &Sugestao, heur: &Sugestao) {
     let pad_ia = 62usize.saturating_sub(largura_visual(&linha_ia));
     let pad_heur = 62usize.saturating_sub(largura_visual(&linha_heur));
 
-    println!("  ┌─ IA ─────────────────────────────────────────────────────────┐");
-    println!("  │  {}{}│", linha_ia, " ".repeat(pad_ia));
-    println!("  └──────────────────────────────────────────────────────────────┘");
-    println!("  ┌─ Heurística ─────────────────────────────────────────────────┐");
-    println!("  │  {}{}│", linha_heur, " ".repeat(pad_heur));
-    println!("  └──────────────────────────────────────────────────────────────┘");
+    println!("  â”Œâ”€ IA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”");
+    println!("  â”‚  {}{}â”‚", linha_ia, " ".repeat(pad_ia));
+    println!("  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜");
+    println!("  â”Œâ”€ HeurÃ­stica â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”");
+    println!("  â”‚  {}{}â”‚", linha_heur, " ".repeat(pad_heur));
+    println!("  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜");
     println!();
     // Caixa de resumo
     let linhas_motivo = quebrar_motivo(&s.motivo, 56);
-    println!("  ┌─ Resumo do Documento ──────────────────────────────────────┐");
-    println!("  │                                                              │");
+    println!("  â”Œâ”€ Resumo do Documento â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”");
+    println!("  â”‚                                                              â”‚");
     for l in &linhas_motivo {
         let p = 56usize.saturating_sub(largura_visual(l));
-        println!("  │  {}{}  │", l, " ".repeat(p));
+        println!("  â”‚  {}{}  â”‚", l, " ".repeat(p));
     }
-    println!("  └──────────────────────────────────────────────────────────────┘");
+    println!("  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜");
 }
 
 fn browser_tui(client: &mut Client, stdin: &io::Stdin) {
@@ -2734,11 +2734,11 @@ fn browser_tui(client: &mut Client, stdin: &io::Stdin) {
         );
         let pad = 62usize.saturating_sub(largura_visual(&header));
 
-        println!("╔══════════════════════════════════════════════════════════════╗");
-        println!("║  NEXUS — BROWSER DE DOCUMENTOS CLASSIFICADOS                ║");
-        println!("╠══════════════════════════════════════════════════════════════╣");
-        println!("║{}{}║", header, " ".repeat(pad));
-        println!("╚══════════════════════════════════════════════════════════════╝");
+        println!("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—");
+        println!("â•‘  NEXUS â€” BROWSER DE DOCUMENTOS CLASSIFICADOS                â•‘");
+        println!("â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£");
+        println!("â•‘{}{}â•‘", header, " ".repeat(pad));
+        println!("â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
         println!();
 
         if docs.is_empty() {
@@ -2749,12 +2749,12 @@ fn browser_tui(client: &mut Client, stdin: &io::Stdin) {
             }
         }
 
-        println!("──────────────────────────────────────────────────────────────");
+        println!("â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€");
         println!("  [j/k] navegar  [n] prox pag  [p] pag ant");
         println!("  [u] uteis  [i] inuteis  [a] todos");
         println!("  [m] mover util/inutil  [v] ver doc  [t] editar tags");
         println!("  [c] autoclassificar sem tags  [q] sair");
-        println!("──────────────────────────────────────────────────────────────");
+        println!("â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€");
         print!("  Comando: ");
         io::stdout().flush().expect("flush");
 
@@ -2877,9 +2877,9 @@ fn browser_tui(client: &mut Client, stdin: &io::Stdin) {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // MAIN
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 fn merge_tags_unicas(existing: Vec<String>, extras: &[String]) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
@@ -3045,13 +3045,18 @@ fn recheck_codex_approved(client: &mut Client) {
 
 fn main() {
     let senha = std::env::var("KB_INGEST_PASSWORD").unwrap_or_else(|_| {
-        eprintln!("[ERRO] KB_INGEST_PASSWORD não definida.");
+        eprintln!("[ERRO] KB_INGEST_PASSWORD nÃ£o definida.");
         std::process::exit(1);
     });
 
+    let pg_host = std::env::var("POSTGRES_HOST").unwrap_or_else(|_| "172.23.160.1".to_string());
+    let pg_port = std::env::var("POSTGRES_PORT").unwrap_or_else(|_| "5433".to_string());
+    let pg_db = std::env::var("POSTGRES_DB").unwrap_or_else(|_| "knowledge_base".to_string());
+    let pg_user = std::env::var("POSTGRES_USER").unwrap_or_else(|_| "kb_ingest".to_string());
+
     let conn_str = format!(
-        "host=172.23.160.1 port=5433 dbname=knowledge_base user=kb_ingest password={}",
-        senha
+        "host={} port={} dbname={} user={} password={}",
+        pg_host, pg_port, pg_db, pg_user, senha
     );
 
     let mut client = Client::connect(&conn_str, NoTls).unwrap_or_else(|e| {
@@ -3070,7 +3075,7 @@ fn main() {
     let mut pulados_sessao = carregar_sessao();
     let sessao_anterior_pulados = pulados_sessao.len();
 
-    // ── Carrega estado completo da sessão anterior ────────────────────────────
+    // â”€â”€ Carrega estado completo da sessÃ£o anterior â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     let estado_anterior = carregar_estado_sessao();
 
     let mut aprovados: u32;
@@ -3081,20 +3086,20 @@ fn main() {
     if let Some(ref estado) = estado_anterior {
         limpar_tela();
         println!();
-        println!("  ┌─ SESSÃO ANTERIOR ENCONTRADA ─────────────────────────────┐");
-        println!("  │  Iniciada em: {}  │", &estado.started_at[..19]);
-        println!("  │  Aprovados  : {}    │", estado.aprovados);
-        println!("  │  Rejeitados : {}    │", estado.rejeitados);
-        println!("  │  Pulados    : {}    │", estado.pulados);
+        println!("  â”Œâ”€ SESSÃƒO ANTERIOR ENCONTRADA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”");
+        println!("  â”‚  Iniciada em: {}  â”‚", &estado.started_at[..19]);
+        println!("  â”‚  Aprovados  : {}    â”‚", estado.aprovados);
+        println!("  â”‚  Rejeitados : {}    â”‚", estado.rejeitados);
+        println!("  â”‚  Pulados    : {}    â”‚", estado.pulados);
         if let Some(ref uid) = estado.ultimo_documento_id {
-            println!("  │  Último ID  : {}  │", uid);
+            println!("  â”‚  Ãšltimo ID  : {}  â”‚", uid);
         }
-        println!("  └──────────────────────────────────────────────────────────┘");
+        println!("  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜");
         println!();
-        print!("  Continuar sessão? [Enter] ou nova sessão [n]: ");
+        print!("  Continuar sessÃ£o? [Enter] ou nova sessÃ£o [n]: ");
         io::stdout()
             .flush()
-            .expect("Erro ao exibir prompt de sessão");
+            .expect("Erro ao exibir prompt de sessÃ£o");
         let resp = ler_linha(&stdin);
         if resp == "n" {
             limpar_sessao();
@@ -3110,17 +3115,17 @@ fn main() {
             started_at = estado.started_at.clone();
         }
     } else if sessao_anterior_pulados > 0 {
-        // Existe apenas o arquivo de pulados (sessão antiga sem JSON de estado)
+        // Existe apenas o arquivo de pulados (sessÃ£o antiga sem JSON de estado)
         limpar_tela();
         println!();
         println!(
-            "  Sessão anterior: {} documentos pulados lembrados.",
+            "  SessÃ£o anterior: {} documentos pulados lembrados.",
             sessao_anterior_pulados
         );
         print!("  Continuar? [Enter] ou limpar [l]: ");
         io::stdout()
             .flush()
-            .expect("Erro ao exibir prompt de sessão legada");
+            .expect("Erro ao exibir prompt de sessÃ£o legada");
         let resp = ler_linha(&stdin);
         if resp == "l" {
             limpar_sessao();
@@ -3159,9 +3164,9 @@ fn main() {
 
         if docs.is_empty() {
             limpar_tela();
-            println!("╔══════════════════════════════════════╗");
-            println!("║     VALIDAÇÃO CONCLUÍDA              ║");
-            println!("╚══════════════════════════════════════╝");
+            println!("â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—");
+            println!("â•‘     VALIDAÃ‡ÃƒO CONCLUÃDA              â•‘");
+            println!("â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•");
             println!();
             println!("  Aprovados : {}", aprovados);
             println!("  Rejeitados: {}", rejeitados);
@@ -3195,15 +3200,15 @@ fn main() {
                     exibir_sugestao(&s);
                 }
                 ModoSugestao::IA => {
-                    // Roda Ollama em thread separada para não bloquear stdin
+                    // Roda Ollama em thread separada para nÃ£o bloquear stdin
                     let dom_clone = doc.domain.clone();
-                    let cont_clone = doc.preview.clone(); // preview já filtrado: sem nav, sem duplicatas
+                    let cont_clone = doc.preview.clone(); // preview jÃ¡ filtrado: sem nav, sem duplicatas
                     let timeout_clone = config.timeout_ollama;
                     let handle = std::thread::spawn(move || {
                         sugerir_ia(&dom_clone, &cont_clone, timeout_clone)
                     });
 
-                    // Thread separada lê stdin para capturar [x]
+                    // Thread separada lÃª stdin para capturar [x]
                     let parar_stdin = Arc::clone(&parar_auto);
                     let stdin_handle = std::thread::spawn(move || {
                         let stdin = io::stdin();
@@ -3235,7 +3240,7 @@ fn main() {
                     }
                     println!();
 
-                    // Se parado pelo usuário, descarta resultado
+                    // Se parado pelo usuÃ¡rio, descarta resultado
                     let resultado_ia = if parar_auto.load(Ordering::Relaxed) {
                         drop(stdin_handle);
                         None
@@ -3247,7 +3252,7 @@ fn main() {
                     if parar_auto.load(Ordering::Relaxed) {
                         parar_auto.store(false, Ordering::Relaxed);
                         modo_sugestao = ModoSugestao::Desligado;
-                        // Redesenha o documento para o usuário não ficar sem contexto
+                        // Redesenha o documento para o usuÃ¡rio nÃ£o ficar sem contexto
                         let pendentes_re = contar_pendentes(&mut client, &pulados_sessao);
                         exibir_documento(
                             doc,
@@ -3265,10 +3270,10 @@ fn main() {
                         let heur = sugerir_heuristica(doc);
                         exibir_sugestao(&s);
 
-                        // Heurística < 60: pede decisão manual com timeout 30s
+                        // HeurÃ­stica < 60: pede decisÃ£o manual com timeout 30s
                         if heur.confianca < config.threshold_heuristica {
                             println!(
-                                "  [IA] Heurística baixa ({}%) — sua decisão em 30s [a/r/u] ou pula:",
+                                "  [IA] HeurÃ­stica baixa ({}%) â€” sua decisÃ£o em 30s [a/r/u] ou pula:",
                                 heur.confianca
                             );
                             io::stdout().flush().ok();
@@ -3302,7 +3307,7 @@ fn main() {
                                 }
                                 "r" | "u" => {
                                     let motivo = if decisao_manual == "u" {
-                                        "conteúdo inútil".to_string()
+                                        "conteÃºdo inÃºtil".to_string()
                                     } else {
                                         format!("[ia-suspeito] {}", s.motivo)
                                     };
@@ -3320,7 +3325,7 @@ fn main() {
                                     println!("  Rejeitado manualmente.");
                                 }
                                 _ => {
-                                    println!("  [IA] Sem resposta — pulando.");
+                                    println!("  [IA] Sem resposta â€” pulando.");
                                     idx += 1;
                                 }
                             }
@@ -3366,12 +3371,12 @@ fn main() {
                             }
                         } else {
                             println!(
-                                "  [IA] Confiança baixa ({}%) — decisão manual necessária.",
+                                "  [IA] ConfianÃ§a baixa ({}%) â€” decisÃ£o manual necessÃ¡ria.",
                                 s.confianca
                             );
                         }
                     } else {
-                        println!("  [IA] Sem resposta da IA — pulando documento.");
+                        println!("  [IA] Sem resposta da IA â€” pulando documento.");
                         std::thread::sleep(std::time::Duration::from_millis(600));
                         idx += 1;
                         continue;
@@ -3379,10 +3384,10 @@ fn main() {
                 }
                 ModoSugestao::Desligado => {}
             }
-            print!("  Decisão: ");
+            print!("  DecisÃ£o: ");
             io::stdout()
                 .flush()
-                .expect("Erro ao exibir prompt de decisão");
+                .expect("Erro ao exibir prompt de decisÃ£o");
 
             let decisao = ler_linha(&stdin);
 
@@ -3408,7 +3413,7 @@ fn main() {
                     stdin
                         .lock()
                         .read_line(&mut buf)
-                        .expect("Erro ao ler motivo de rejeição");
+                        .expect("Erro ao ler motivo de rejeiÃ§Ã£o");
                     let motivo = buf.trim().to_string();
                     let motivo = if motivo.is_empty() {
                         "sem motivo".to_string()
@@ -3427,7 +3432,7 @@ fn main() {
                     idx += 1;
                 }
                 "u" => {
-                    db_rejeitar(&mut client, &doc.id, "conteúdo inútil");
+                    db_rejeitar(&mut client, &doc.id, "conteÃºdo inÃºtil");
                     let tags_u = prompt_tags(doc, false, &stdin);
                     db_salvar_tags(&mut client, &doc.id, &tags_u);
                     historico.push(HistoricoItem {
@@ -3469,7 +3474,7 @@ fn main() {
                         if idx > 0 {
                             idx -= 1;
                         }
-                        // Persiste estado após desfazer
+                        // Persiste estado apÃ³s desfazer
                         salvar_estado_sessao(&EstadoSessao {
                             started_at: started_at.clone(),
                             aprovados,
@@ -3477,20 +3482,20 @@ fn main() {
                             pulados: pulados_conta,
                             ultimo_documento_id: historico.last().map(|h| h.id.clone()),
                         });
-                        println!("  ✓ Última decisão desfeita.");
+                        println!("  âœ“ Ãšltima decisÃ£o desfeita.");
                         std::thread::sleep(std::time::Duration::from_millis(700));
                     } else {
-                        println!("  Nenhuma decisão para desfazer.");
+                        println!("  Nenhuma decisÃ£o para desfazer.");
                         std::thread::sleep(std::time::Duration::from_millis(700));
                     }
                 }
                 "h" => {
                     if modo_sugestao == ModoSugestao::Heuristica {
                         modo_sugestao = ModoSugestao::Desligado;
-                        println!("  Heurística: DESLIGADA");
+                        println!("  HeurÃ­stica: DESLIGADA");
                     } else {
                         modo_sugestao = ModoSugestao::Heuristica;
-                        println!("  Heurística: LIGADA");
+                        println!("  HeurÃ­stica: LIGADA");
                     }
                     std::thread::sleep(std::time::Duration::from_millis(500));
                 }
@@ -3520,12 +3525,12 @@ fn main() {
                     print!("  [Enter]: ");
                     io::stdout()
                         .flush()
-                        .expect("Erro ao exibir prompt pós-sugestão");
+                        .expect("Erro ao exibir prompt pÃ³s-sugestÃ£o");
                     let mut buf = String::new();
                     stdin
                         .lock()
                         .read_line(&mut buf)
-                        .expect("Erro ao aguardar confirmação de sugestão");
+                        .expect("Erro ao aguardar confirmaÃ§Ã£o de sugestÃ£o");
                 }
                 "e" => {
                     exibir_estatisticas(&mut client, inicio_sessao, aprovados, rejeitados, &stdin);
@@ -3543,7 +3548,7 @@ fn main() {
                 "s" => {
                     limpar_tela();
                     println!(
-                        "  Sessão salva. Aprovados={} Rejeitados={} Pulados={}",
+                        "  SessÃ£o salva. Aprovados={} Rejeitados={} Pulados={}",
                         aprovados, rejeitados, pulados_conta
                     );
                     break 'principal;
@@ -3553,7 +3558,7 @@ fn main() {
                     print!("  Sair sem salvar pulados? [s/N]: ");
                     io::stdout()
                         .flush()
-                        .expect("Erro ao exibir prompt de saída");
+                        .expect("Erro ao exibir prompt de saÃ­da");
                     if ler_linha(&stdin) == "s" {
                         println!(
                             "  Encerrado. Aprovados={} Rejeitados={} Pulados={}",
@@ -3567,18 +3572,19 @@ fn main() {
                     print!("  [Enter]: ");
                     io::stdout()
                         .flush()
-                        .expect("Erro ao exibir prompt pós-ajuda");
+                        .expect("Erro ao exibir prompt pÃ³s-ajuda");
                     let mut buf = String::new();
                     stdin
                         .lock()
                         .read_line(&mut buf)
-                        .expect("Erro ao aguardar confirmação de ajuda");
+                        .expect("Erro ao aguardar confirmaÃ§Ã£o de ajuda");
                 }
                 _ => {
-                    println!("  Comando '{}' não reconhecido. [h] para ajuda.", decisao);
+                    println!("  Comando '{}' nÃ£o reconhecido. [h] para ajuda.", decisao);
                     std::thread::sleep(std::time::Duration::from_millis(700));
                 }
             }
         }
     }
 }
+

@@ -70,42 +70,23 @@
     </div>
 
     <div class="section-label">// 02</div>
-    <h2>Logs</h2>
-    <div class="panel">
-      <div class="panel-header">
-        <div class="panel-dot pd-red"></div>
-        <div class="panel-dot pd-amber"></div>
-        <div class="panel-dot pd-green"></div>
-        <span style="margin-left:8px;">stdout - stream de saída</span>
-      </div>
-      <div class="panel-body">
-        <div class="logs-controls">
-          <select id="logs-service" class="logs-select"></select>
-          <input id="logs-lines" type="number" min="1" max="1000" value="200" class="logs-lines" style="width:90px">
-          <button class="btn-load-logs" onclick="loadLogs()">▶ Carregar</button>
-        </div>
-        <div class="logs-output" id="logs-output">(sem logs)</div>
-      </div>
-    </div>
-
-    <div class="section-label">// 03</div>
     <h2>Terminal</h2>
     <div class="panel">
       <div class="panel-header">
         <div class="panel-dot pd-red"></div>
         <div class="panel-dot pd-amber"></div>
         <div class="panel-dot pd-green"></div>
-        <span style="margin-left:8px;">stdin - comando remoto por serviço</span>
+        <span style="margin-left:8px;">stdin - sessão interativa do serviço</span>
       </div>
       <div class="panel-body">
         <div class="logs-controls">
           <select id="term-service" class="logs-select" onchange="onTerminalServiceChange()"></select>
-          <input id="term-lines" type="number" min="1" max="1000" value="120" class="logs-lines" style="width:90px">
+          <input id="term-chars" type="number" min="512" max="64000" value="12000" class="logs-lines" style="width:110px">
           <button class="btn-load-logs" onclick="refreshTerminalOutput()">↺ Atualizar</button>
         </div>
 
         <div class="term-input-row">
-          <input id="term-input" class="term-input" type="text" placeholder="Digite um comando para o serviço selecionado" autocomplete="off">
+          <input id="term-input" class="term-input" type="text" placeholder="Digite teclas/comandos para o serviço selecionado" autocomplete="off">
           <label class="term-check"><input id="term-append-newline" type="checkbox" checked> enviar ENTER</label>
           <button id="term-send" class="btn-load-logs" onclick="sendTerminalInput()">Enviar</button>
         </div>
@@ -125,7 +106,7 @@
           <button class="term-key" onclick="sendTermShortcut('help')">help</button>
         </div>
 
-        <div class="term-hint" id="term-hint">Selecione um serviço interativo para enviar comandos.</div>
+        <div class="term-hint" id="term-hint">Selecione um serviço interativo para abrir a sessão remota.</div>
         <div class="logs-output term-output" id="term-output">(sem saída)</div>
       </div>
     </div>
