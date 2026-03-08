@@ -6,6 +6,7 @@ use uuid::Uuid;
 use crate::error::Result;
 
 #[derive(Debug, sqlx::FromRow)]
+#[allow(dead_code)]
 pub struct ApprovedDocument {
     pub id: Uuid,
     pub content: String,

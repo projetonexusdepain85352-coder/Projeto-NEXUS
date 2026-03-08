@@ -90,7 +90,7 @@ pub async fn run_approval_tui(pool: &PgPool) -> Result<()> {
                     .borders(Borders::ALL)
                     .title(" NEXUS MTP -- Aprovacao "),
             )
-            .highlight_style(
+            .row_highlight_style(
                 Style::default()
                     .bg(Color::Blue)
                     .add_modifier(Modifier::BOLD),

@@ -10,6 +10,7 @@ use tracing::{error, info, warn};
 
 use crate::error::{MtpError, Result};
 
+#[allow(dead_code)]
 pub struct TrainJob {
     pub base_model: String,
     pub dataset_path: PathBuf,
