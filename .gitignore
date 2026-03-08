@@ -1,14 +1,36 @@
-mistral-7b/
-backups/
-logs/
+# Build Rust
+**/target/
+**/*.rlib
+**/*.rmeta
+**/*.d
+**/*.o
+**/*.so
+**/*.timestamp
+
+# Dados operacionais
+data/
 dados/
 models/
-**/target/
-nexus_control_server/.state.json
-nexus_control_server/__pycache__/
-nexus_rag/.fastembed_cache/
-nexus_sugestor/*.log
-nexus_control_server/*.log
-nexus_control_server/.env.worker
-nexus_control_server/.nexus_start.pid
-nexus_control_server/bin/
+snapshots/
+dumps/
+*.dump
+*.bak
+*.bak2
+
+# Logs
+logs/
+*.log
+
+# Ambiente local
+.env
+.env.local
+*.env
+
+# Banco de dados local
+*.db
+*.sqlite
+*.sqlite3
+
+# OS
+.DS_Store
+Thumbs.db
