@@ -1,9 +1,0 @@
-/mnt/c/Users/dulan/OneDrive/Documentos/GitHub/Projeto-NEXUS/nexus_mtp/target/debug/build/portable-atomic-9c792f0b8c5d8801/build_script_build-9c792f0b8c5d8801.d: /home/dulan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/portable-atomic-1.13.1/build.rs /home/dulan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/portable-atomic-1.13.1/version.rs /home/dulan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/portable-atomic-1.13.1/src/gen/build.rs
-
-/mnt/c/Users/dulan/OneDrive/Documentos/GitHub/Projeto-NEXUS/nexus_mtp/target/debug/build/portable-atomic-9c792f0b8c5d8801/build_script_build-9c792f0b8c5d8801: /home/dulan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/portable-atomic-1.13.1/build.rs /home/dulan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/portable-atomic-1.13.1/version.rs /home/dulan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/portable-atomic-1.13.1/src/gen/build.rs
-
-/home/dulan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/portable-atomic-1.13.1/build.rs:
-/home/dulan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/portable-atomic-1.13.1/version.rs:
-/home/dulan/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/portable-atomic-1.13.1/src/gen/build.rs:
-
-# env-dep:CARGO_PKG_NAME=portable-atomic

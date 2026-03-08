@@ -1,0 +1,36 @@
+﻿{
+  "services": {
+    "sugestor": {
+      "command": ["{python}", "src/nexus_sugestor/servidor.py"],
+      "cwd": "{project_root}",
+      "env": {
+        "PYTHONUNBUFFERED": "1"
+      }
+    },
+    "agente_intermediario": {
+      "command": [
+        "bash",
+        "-lc",
+        "set -euo pipefail; PROJECT_ROOT=\"${NEXUS_PROJECT_ROOT:-$PWD}\"; if [ -f \"$PROJECT_ROOT/config/scripts/run_copy_env.sh\" ]; then source \"$PROJECT_ROOT/config/scripts/run_copy_env.sh\" >/dev/null 2>&1 || true; fi; if [ -f \"$PROJECT_ROOT/config/scripts/resolve_kb_ingest_password.sh\" ]; then source \"$PROJECT_ROOT/config/scripts/resolve_kb_ingest_password.sh\"; nexus_resolve_kb_ingest_password || true; fi; if [ -z \"${KB_INGEST_PASSWORD:-}\" ] && [ -n \"${NEXUS_KB_INGEST_PASSWORD:-}\" ]; then export KB_INGEST_PASSWORD=\"$NEXUS_KB_INGEST_PASSWORD\"; fi; if [ -z \"${KB_INGEST_PASSWORD:-}\" ]; then echo 'KB_INGEST_PASSWORD ausente'; exit 1; fi; cd \"$PROJECT_ROOT/src/agente_intermediario\"; if [ -x target/release/agente_intermediario ]; then exec target/release/agente_intermediario; else exec cargo run --release; fi"
+      ],
+      "cwd": "{project_root}",
+      "interactive": true,
+      "env": {
+        "RUST_BACKTRACE": "1"
+      }
+    },
+    "validador": {
+      "command": [
+        "bash",
+        "-lc",
+        "set -euo pipefail; PROJECT_ROOT=\"${NEXUS_PROJECT_ROOT:-$PWD}\"; if [ -f \"$PROJECT_ROOT/config/scripts/run_copy_env.sh\" ]; then source \"$PROJECT_ROOT/config/scripts/run_copy_env.sh\" >/dev/null 2>&1 || true; fi; export POSTGRES_USER=kb_ingest; export POSTGRES_INGEST_USER=kb_ingest; if [ -f \"$PROJECT_ROOT/config/scripts/resolve_kb_ingest_password.sh\" ]; then source \"$PROJECT_ROOT/config/scripts/resolve_kb_ingest_password.sh\"; nexus_resolve_kb_ingest_password || true; fi; if [ -z \"${KB_INGEST_PASSWORD:-}\" ] && [ -n \"${NEXUS_KB_INGEST_PASSWORD:-}\" ]; then export KB_INGEST_PASSWORD=\"$NEXUS_KB_INGEST_PASSWORD\"; fi; if [ -z \"${KB_INGEST_PASSWORD:-}\" ]; then echo 'KB_INGEST_PASSWORD ausente'; exit 1; fi; cd \"$PROJECT_ROOT/src/validador\"; if [ -x target/release/nexus_validador ]; then exec target/release/nexus_validador; elif [ -x target/release/validador ]; then exec target/release/validador; else exec cargo run --release; fi"
+      ],
+      "cwd": "{project_root}",
+      "interactive": true,
+      "env": {
+        "RUST_BACKTRACE": "1"
+      }
+    }
+  }
+}
+
