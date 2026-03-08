@@ -1,0 +1,8 @@
+[workspace]
+members = [
+  "src/agente_intermediario",
+  "src/nexus_rag",
+  "src/nexus_mtp",
+  "src/validador"
+]
+resolver = "2"
