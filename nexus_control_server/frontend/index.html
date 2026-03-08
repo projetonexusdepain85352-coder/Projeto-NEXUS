@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NEXUS — Control Server</title>
+<title>NEXUS - Control Server</title>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <link rel="stylesheet" href="/frontend/styles.css">
 </head>
@@ -21,7 +21,7 @@
     <div class="login-subtitle">Control Server · v1.0</div>
     <hr class="login-divider">
     <div class="google-btn-wrap">
-      <div class="google-btn-label">— AUTENTICAR COM GOOGLE —</div>
+      <div class="google-btn-label">- AUTENTICAR COM GOOGLE -</div>
       <div id="google-btn-real"></div>
     </div>
     <div id="login-status"><span class="status-blink" id="login-cursor" style="display:none">█</span><span id="login-msg"></span></div>
@@ -38,7 +38,7 @@
       </div>
       <div class="nav-user">
         <div class="nav-user-dot"></div>
-        Sessão ativa · <em id="nav-email">—</em>
+        Sessão ativa · <em id="nav-email">-</em>
       </div>
       <button class="nav-logout" onclick="logout()">[ sair ]</button>
     </div>
@@ -52,7 +52,7 @@
         <div class="panel-dot pd-red"></div>
         <div class="panel-dot pd-amber"></div>
         <div class="panel-dot pd-green"></div>
-        <span style="margin-left:8px;">nexus — processos gerenciados</span>
+        <span style="margin-left:8px;">nexus - processos gerenciados</span>
         <button class="btn-refresh" style="margin-left:auto" onclick="refreshServices()">↺ Atualizar</button>
       </div>
       <div class="panel-body">
@@ -76,7 +76,7 @@
         <div class="panel-dot pd-red"></div>
         <div class="panel-dot pd-amber"></div>
         <div class="panel-dot pd-green"></div>
-        <span style="margin-left:8px;">stdout — stream de saída</span>
+        <span style="margin-left:8px;">stdout - stream de saída</span>
       </div>
       <div class="panel-body">
         <div class="logs-controls">
@@ -88,17 +88,58 @@
       </div>
     </div>
 
+    <div class="section-label">// 03</div>
+    <h2>Terminal</h2>
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-dot pd-red"></div>
+        <div class="panel-dot pd-amber"></div>
+        <div class="panel-dot pd-green"></div>
+        <span style="margin-left:8px;">stdin - comando remoto por serviço</span>
+      </div>
+      <div class="panel-body">
+        <div class="logs-controls">
+          <select id="term-service" class="logs-select" onchange="onTerminalServiceChange()"></select>
+          <input id="term-lines" type="number" min="1" max="1000" value="120" class="logs-lines" style="width:90px">
+          <button class="btn-load-logs" onclick="refreshTerminalOutput()">↺ Atualizar</button>
+        </div>
+
+        <div class="term-input-row">
+          <input id="term-input" class="term-input" type="text" placeholder="Digite um comando para o serviço selecionado" autocomplete="off">
+          <label class="term-check"><input id="term-append-newline" type="checkbox" checked> enviar ENTER</label>
+          <button id="term-send" class="btn-load-logs" onclick="sendTerminalInput()">Enviar</button>
+        </div>
+
+        <div class="term-shortcuts">
+          <button class="term-key" onclick="sendTermShortcut('a')">a</button>
+          <button class="term-key" onclick="sendTermShortcut('r')">r</button>
+          <button class="term-key" onclick="sendTermShortcut('u')">u</button>
+          <button class="term-key" onclick="sendTermShortcut('p')">p</button>
+          <button class="term-key" onclick="sendTermShortcut('i')">i</button>
+          <button class="term-key" onclick="sendTermShortcut('t')">t</button>
+          <button class="term-key" onclick="sendTermShortcut('v')">v</button>
+          <button class="term-key" onclick="sendTermShortcut('?')">?</button>
+          <button class="term-key" onclick="sendTermShortcut('e')">e</button>
+          <button class="term-key" onclick="sendTermShortcut('s')">s</button>
+          <button class="term-key" onclick="sendTermShortcut('q')">q</button>
+          <button class="term-key" onclick="sendTermShortcut('help')">help</button>
+        </div>
+
+        <div class="term-hint" id="term-hint">Selecione um serviço interativo para enviar comandos.</div>
+        <div class="logs-output term-output" id="term-output">(sem saída)</div>
+      </div>
+    </div>
+
     <div class="status-bar">
       <div class="status-bar-item"><div class="dot"></div>Worker: nexus-control.projeton-e-x-u-sdepain85352.workers.dev</div>
       <div class="status-bar-item"><div class="dot"></div>Porta local: 8787</div>
-      <div class="status-bar-time" id="status-time">—</div>
+      <div class="status-bar-time" id="status-time">-</div>
     </div>
   </main>
 </div>
 
 <div id="toast"></div>
 
-
-  <script src="/frontend/app.js" defer></script>
+<script src="/frontend/app.js" defer></script>
 </body>
 </html>

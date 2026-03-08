@@ -6,6 +6,30 @@
       "env": {
         "PYTHONUNBUFFERED": "1"
       }
+    },
+    "agente_intermediario": {
+      "command": [
+        "bash",
+        "-lc",
+        "set -euo pipefail; cd agente_intermediario; if [ -x target/release/agente_intermediario ]; then exec target/release/agente_intermediario; else exec cargo run --release; fi"
+      ],
+      "cwd": ".",
+      "interactive": true,
+      "env": {
+        "RUST_BACKTRACE": "1"
+      }
+    },
+    "validador": {
+      "command": [
+        "bash",
+        "-lc",
+        "set -euo pipefail; cd validador; if [ -x target/release/nexus_validador ]; then exec target/release/nexus_validador; elif [ -x target/release/validador ]; then exec target/release/validador; else exec cargo run --release; fi"
+      ],
+      "cwd": ".",
+      "interactive": true,
+      "env": {
+        "RUST_BACKTRACE": "1"
+      }
     }
   }
 }

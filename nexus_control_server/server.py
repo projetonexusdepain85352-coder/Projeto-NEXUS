@@ -33,6 +33,7 @@ SESSIONS_LOCK = threading.Lock()
 MAX_JSON_BODY_BYTES = 32 * 1024
 MAX_TOKEN_LENGTH = 256
 TOKEN_RE = re.compile(r"^[A-Za-z0-9._~-]{20,256}$")
+MAX_STDIN_INPUT_BYTES = 2048
 SESSION_MAX_PER_EMAIL = 5
 SESSION_BIND_CONTEXT = os.environ.get("NEXUS_SESSION_BIND_CONTEXT", "1").strip().lower() not in {"0", "false", "no"}
 AUTH_RATE_LIMIT_WINDOW_SECONDS = 5 * 60
@@ -291,6 +292,7 @@ class ServiceManager:
         self.config_path = config_path
         self.state_path = state_path
         self.lock = threading.Lock()
+        self.runtime_processes = {}
 
     def config(self):
         raw = read_json(self.config_path, {"services": {}})
@@ -308,8 +310,28 @@ class ServiceManager:
             pid = int(meta.get("pid", 0) or 0)
             if pid and not is_pid_running(pid):
                 to_delete.append(name)
+
         for name in to_delete:
             state["services"].pop(name, None)
+
+        dead_runtime = []
+        for name, proc in list(self.runtime_processes.items()):
+            try:
+                if proc.poll() is not None:
+                    dead_runtime.append(name)
+            except Exception:
+                dead_runtime.append(name)
+
+        for name in dead_runtime:
+            proc = self.runtime_processes.pop(name, None)
+            if proc and proc.stdin:
+                try:
+                    proc.stdin.close()
+                except Exception:
+                    pass
+
+    def _is_interactive_service(self, spec: dict) -> bool:
+        return bool(spec.get("interactive", False))
 
     def list_services(self):
         with self.lock:
@@ -320,16 +342,20 @@ class ServiceManager:
 
             out = []
             for name, spec in cfg.items():
-                proc = state.get("services", {}).get(name, {})
-                pid = int(proc.get("pid", 0) or 0)
+                proc_state = state.get("services", {}).get(name, {})
+                pid = int(proc_state.get("pid", 0) or 0)
+                runtime_proc = self.runtime_processes.get(name)
+                stdin_available = bool(runtime_proc and runtime_proc.poll() is None and runtime_proc.stdin)
                 out.append({
                     "name": name,
                     "running": is_pid_running(pid),
                     "pid": pid if pid else None,
                     "command": spec.get("command", []),
                     "cwd": spec.get("cwd", "."),
-                    "log_file": proc.get("log_file"),
-                    "started_at": proc.get("started_at"),
+                    "interactive": self._is_interactive_service(spec),
+                    "stdin_available": stdin_available,
+                    "log_file": proc_state.get("log_file"),
+                    "started_at": proc_state.get("started_at"),
                 })
             return out
 
@@ -364,15 +390,23 @@ class ServiceManager:
             log_file = LOG_DIR / f"{name}.log"
             log_fp = log_file.open("a", encoding="utf-8")
 
+            interactive = self._is_interactive_service(spec)
             creationflags = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
 
             proc = subprocess.Popen(
-                cmd, cwd=str(cwd), env=env,
-                stdout=log_fp, stderr=subprocess.STDOUT,
+                cmd,
+                cwd=str(cwd),
+                env=env,
+                stdout=log_fp,
+                stderr=subprocess.STDOUT,
+                stdin=subprocess.PIPE if interactive else subprocess.DEVNULL,
+                text=True,
+                bufsize=1,
                 creationflags=creationflags,
             )
             log_fp.close()
 
+            self.runtime_processes[name] = proc
             state.setdefault("services", {})[name] = {
                 "pid": proc.pid,
                 "started_at": now_iso(),
@@ -390,6 +424,7 @@ class ServiceManager:
             if not item:
                 return {"name": name, "running": False, "stopped": False, "reason": "not running"}
 
+            runtime_proc = self.runtime_processes.pop(name, None)
             pid = int(item.get("pid", 0) or 0)
             if pid <= 0:
                 state["services"].pop(name, None)
@@ -412,9 +447,75 @@ class ServiceManager:
                     except ProcessLookupError:
                         pass
 
+            if runtime_proc and runtime_proc.stdin:
+                try:
+                    runtime_proc.stdin.close()
+                except Exception:
+                    pass
+
             state["services"].pop(name, None)
             self._save_state(state)
             return {"name": name, "running": False, "stopped": True}
+
+    def send_input(self, name: str, input_text: str, append_newline: bool = True):
+        with self.lock:
+            cfg = self.config()
+            spec = cfg.get(name)
+            if not spec:
+                raise ValueError("servico nao encontrado")
+            if not self._is_interactive_service(spec):
+                raise PermissionError("servico nao aceita entrada interativa")
+
+            state = self._state()
+            self._cleanup(state)
+            self._save_state(state)
+
+            proc = self.runtime_processes.get(name)
+            if not proc:
+                return {
+                    "name": name,
+                    "running": False,
+                    "accepted": False,
+                    "reason": "stdin indisponivel; reinicie o servico por este painel",
+                }
+            if proc.poll() is not None:
+                return {
+                    "name": name,
+                    "running": False,
+                    "accepted": False,
+                    "reason": "servico parado",
+                }
+            if not proc.stdin:
+                return {
+                    "name": name,
+                    "running": True,
+                    "accepted": False,
+                    "reason": "stdin nao disponivel",
+                }
+
+            clean = (input_text or "").replace("\x00", "")
+            payload = clean + ("\n" if append_newline else "")
+            encoded = payload.encode("utf-8", errors="replace")
+            if len(encoded) > MAX_STDIN_INPUT_BYTES:
+                raise ValueError("entrada excede limite")
+
+            try:
+                proc.stdin.write(payload)
+                proc.stdin.flush()
+            except Exception:
+                return {
+                    "name": name,
+                    "running": False,
+                    "accepted": False,
+                    "reason": "falha ao escrever no processo",
+                }
+
+            return {
+                "name": name,
+                "running": True,
+                "accepted": True,
+                "sent_bytes": len(encoded),
+            }
 
     def _safe_log_path(self, path_value: str):
         try:
@@ -448,7 +549,6 @@ class ServiceManager:
 
         content = safe_path.read_text(encoding="utf-8", errors="replace").splitlines()
         return "\n".join(content[-lines:])
-
 
 def _is_production() -> bool:
     return (os.environ.get("NEXUS_ENV", "").strip().lower() == "production")
@@ -780,6 +880,53 @@ def make_handler(manager: ServiceManager):
                         print(f"[NEXUS Control] stop service error: {exc!r}")
                         return json_response(self, 500, {"error": "erro interno"})
 
+                if parsed.path.startswith("/api/services/") and parsed.path.endswith("/stdin"):
+                    if not require_auth(self, query, scope="services:mutate"):
+                        return
+
+                    allowed, retry_after = enforce_rate_limit(
+                        self,
+                        "services:mutate",
+                        SERVICE_MUTATION_RATE_LIMIT_MAX,
+                        API_RATE_LIMIT_WINDOW_SECONDS,
+                    )
+                    if not allowed:
+                        return json_response(
+                            self,
+                            429,
+                            {"error": "muitas requisicoes de controle"},
+                            extra_headers={"Retry-After": str(retry_after)},
+                        )
+
+                    raw_name = parsed.path[len("/api/services/"):-len("/stdin")]
+                    name = clean_service_name(raw_name)
+                    if not name:
+                        return json_response(self, 400, {"error": "nome de servico invalido"})
+
+                    try:
+                        payload = read_json_body(self)
+                    except ValueError as exc:
+                        return json_response(self, 400, {"error": str(exc)})
+
+                    input_text = payload.get("input", "")
+                    append_newline = payload.get("append_newline", True)
+
+                    if not isinstance(input_text, str):
+                        return json_response(self, 400, {"error": "campo 'input' deve ser string"})
+                    if not isinstance(append_newline, bool):
+                        append_newline = True
+
+                    try:
+                        result = manager.send_input(name, input_text, append_newline)
+                        return json_response(self, 200, result)
+                    except PermissionError:
+                        return json_response(self, 403, {"error": "servico nao aceita entrada interativa"})
+                    except ValueError as exc:
+                        return json_response(self, 400, {"error": str(exc)})
+                    except Exception as exc:
+                        print(f"[NEXUS Control] stdin service error: {exc!r}")
+                        return json_response(self, 500, {"error": "erro interno"})
+
                 return json_response(self, 404, {"error": "rota nao encontrada"})
             except Exception as exc:
                 print(f"[NEXUS Control] POST error: {exc!r}")
@@ -812,3 +959,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
