@@ -60,7 +60,8 @@ fi
 
 echo "[NEXUS] Abrindo validador..."
 cd "$PROJECT_ROOT/src/validador"
-export KB_INGEST_PASSWORD="${KB_INGEST_PASSWORD:-KbIngest2026seCCKDS88448cure}"
+password="${NEXUS_DB_PASSWORD:?Variável NEXUS_DB_PASSWORD não definida}"
+export KB_INGEST_PASSWORD="$password"
 if [[ -x "./target/release/nexus_validador" ]]; then
     ./target/release/nexus_validador
 elif [[ -x "./target/release/validador" ]]; then
@@ -68,4 +69,6 @@ elif [[ -x "./target/release/validador" ]]; then
 else
     cargo run --release
 fi
+
+
 
