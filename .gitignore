@@ -26,6 +26,20 @@ logs/
 .env.local
 *.env
 
+# Ambientes Python
+.venv/
+.venv_*/
+venv/
+venv_*/
+
+# Artefatos de treino locais
+datasets/
+unsloth_compiled_cache/
+
+# Scripts temporarios locais
+tmp_*.py
+write_benchmark.py
+
 # Banco de dados local
 *.db
 *.sqlite
