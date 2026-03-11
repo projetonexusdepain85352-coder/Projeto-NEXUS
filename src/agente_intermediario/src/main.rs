@@ -1000,9 +1000,16 @@ fn main() {
         std::process::exit(1);
     });
 
+    let pg_host = std::env::var("POSTGRES_HOST").unwrap_or_else(|_| "localhost".to_string());
+    let pg_port = std::env::var("POSTGRES_PORT").unwrap_or_else(|_| "5433".to_string());
+    let pg_db = std::env::var("POSTGRES_DB").unwrap_or_else(|_| "knowledge_base".to_string());
+    let pg_user = std::env::var("POSTGRES_INGEST_USER")
+        .or_else(|_| std::env::var("POSTGRES_USER"))
+        .unwrap_or_else(|_| "kb_ingest".to_string());
+
     let conn_str = format!(
-        "host=localhost port=5432 dbname=knowledge_base user=kb_ingest password={}",
-        senha
+        "host={} port={} dbname={} user={} password={}",
+        pg_host, pg_port, pg_db, pg_user, senha
     );
 
     let mut client = match postgres::Client::connect(&conn_str, postgres::NoTls) {

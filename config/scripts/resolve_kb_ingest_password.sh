@@ -3,7 +3,7 @@ set -euo pipefail
 
 nexus_resolve_kb_ingest_password() {
   local host="${POSTGRES_HOST:-127.0.0.1}"
-  local port="${POSTGRES_PORT:-5432}"
+  local port="${POSTGRES_PORT:-5433}"
   local db="${POSTGRES_DB:-knowledge_base}"
   local user="${POSTGRES_INGEST_USER:-kb_ingest}"
 

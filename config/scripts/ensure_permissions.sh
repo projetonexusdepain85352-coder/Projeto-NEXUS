@@ -3,7 +3,7 @@ set -euo pipefail
 
 nexus_pg_check_reader() {
   local host="${POSTGRES_HOST:-localhost}"
-  local port="${POSTGRES_PORT:-5432}"
+  local port="${POSTGRES_PORT:-5433}"
   local db="${POSTGRES_DB:-knowledge_base}"
 
   if [[ -z "${KB_READER_PASSWORD:-}" ]]; then
@@ -18,7 +18,7 @@ nexus_pg_check_reader() {
 
 nexus_pg_reapply_reader_grants() {
   local host="${POSTGRES_HOST:-localhost}"
-  local port="${POSTGRES_PORT:-5432}"
+  local port="${POSTGRES_PORT:-5433}"
   local db="${POSTGRES_DB:-knowledge_base}"
   local sql="GRANT USAGE ON SCHEMA public TO kb_reader; GRANT SELECT ON ALL TABLES IN SCHEMA public TO kb_reader; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO kb_reader;"
 

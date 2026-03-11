@@ -45,6 +45,11 @@ pub fn run_training(job: &TrainJob) -> Result<TrainResult> {
 
     let mut child = Command::new("python3")
         .arg(&script_path)
+        .env("TORCHINDUCTOR_DISABLE", "1")
+        .env("TORCH_COMPILE_DISABLE", "1")
+        .env("UNSLOTH_ENABLE_CCE", "0")
+        .env("UNSLOTH_COMPILE_DISABLE", "1")
+        .env("UNSLOTH_CE_LOSS_N_CHUNKS", "4096")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
@@ -108,7 +113,7 @@ pub fn run_training(job: &TrainJob) -> Result<TrainResult> {
 }
 
 fn build_python_script(job: &TrainJob) -> String {
-    let base_model = sanitize_str(&job.base_model);
+    let model_path = sanitize_str(&resolve_model_path(&job.base_model));
     let dataset_path = sanitize_str(&job.dataset_path.to_string_lossy());
     let adapter_path = sanitize_str(&job.adapter_path.to_string_lossy());
     let output_dir = sanitize_str(&job.output_dir.to_string_lossy());
@@ -119,76 +124,104 @@ fn build_python_script(job: &TrainJob) -> String {
     let lr = job.learning_rate;
 
     format!(
-        "#!/usr/bin/env python3\n\
-         # Gerado automaticamente pelo nexus_mtp\n\
-         from unsloth import FastLanguageModel\n\
-         from trl import SFTTrainer\n\
-         from transformers import TrainingArguments\n\
-         from datasets import load_dataset\n\
-         \n\
-         print('Carregando modelo: {base_model}', flush=True)\n\
-         model, tokenizer = FastLanguageModel.from_pretrained(\n\
-             model_name='{base_model}',\n\
-             max_seq_length={max_seq_len},\n\
-             dtype=None,\n\
-             load_in_4bit=True,\n\
-         )\n\
-         \n\
-         model = FastLanguageModel.get_peft_model(\n\
-             model,\n\
-             r={lora_r},\n\
-             target_modules=['q_proj', 'k_proj', 'v_proj', 'o_proj'],\n\
-             lora_alpha={lora_alpha},\n\
-             lora_dropout=0.05,\n\
-             bias='none',\n\
-             use_gradient_checkpointing='unsloth',\n\
-         )\n\
-         \n\
-         print('Carregando dataset: {dataset_path}', flush=True)\n\
-         dataset = load_dataset('json', data_files='{dataset_path}', split='train')\n\
-         \n\
-         def format_alpaca(example):\n\
-             return {{'text': (\n\
-                 '### Instruction:\\n' + example['instruction'] + '\\n\\n'\n\
-                 '### Input:\\n'       + example['input']       + '\\n\\n'\n\
-                 '### Response:\\n'    + example['output']\n\
-             )}}\n\
-         \n\
-         dataset = dataset.map(format_alpaca)\n\
-         print(f'Dataset: {{len(dataset)}} exemplos.', flush=True)\n\
-         \n\
-         trainer = SFTTrainer(\n\
-             model=model,\n\
-             tokenizer=tokenizer,\n\
-             train_dataset=dataset,\n\
-             dataset_text_field='text',\n\
-             max_seq_length={max_seq_len},\n\
-             args=TrainingArguments(\n\
-                 per_device_train_batch_size=1,\n\
-                 gradient_accumulation_steps=8,\n\
-                 warmup_steps=100,\n\
-                 num_train_epochs={epochs},\n\
-                 learning_rate={lr},\n\
-                 fp16=True,\n\
-                 output_dir='{output_dir}',\n\
-                 save_steps=100,\n\
-                 logging_steps=10,\n\
-                 report_to='none',\n\
-             ),\n\
-         )\n\
-         \n\
-         print('Iniciando fine-tuning...', flush=True)\n\
-         trainer.train()\n\
-         \n\
-         print('Salvando adapter...', flush=True)\n\
-         model.save_pretrained('{adapter_path}')\n\
-         tokenizer.save_pretrained('{adapter_path}')\n\
-         print('NEXUS_TRAINING_COMPLETE', flush=True)\n"
+        r####"#!/usr/bin/env python3
+# Gerado automaticamente pelo nexus_mtp
+import os
+os.environ["TORCHINDUCTOR_DISABLE"] = "1"
+os.environ["TORCH_COMPILE_DISABLE"] = "1"
+
+import torch
+from peft import LoraConfig, get_peft_model
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from trl import SFTTrainer, SFTConfig
+from datasets import load_dataset
+
+MODEL_PATH = "{model_path}"
+print('Carregando modelo: {model_path}', flush=True)
+
+bnb_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_compute_dtype=torch.bfloat16,
+    bnb_4bit_use_double_quant=True,
+    bnb_4bit_quant_type="nf4",
+)
+
+model = AutoModelForCausalLM.from_pretrained(
+    MODEL_PATH,
+    quantization_config=bnb_config,
+    device_map="auto",
+)
+tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
+tokenizer.pad_token = tokenizer.eos_token
+
+model = get_peft_model(model, LoraConfig(
+    r={lora_r},
+    lora_alpha={lora_alpha},
+    target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
+    lora_dropout=0.05,
+    bias="none",
+    task_type="CAUSAL_LM",
+))
+model.print_trainable_parameters()
+
+print('Carregando dataset: {dataset_path}', flush=True)
+dataset = load_dataset("json", data_files="{dataset_path}", split="train")
+dataset = dataset.map(lambda x: {{
+    "text": "### Instruction:\n" + x["instruction"] +
+            "\n\n### Input:\n" + x["input"] +
+            "\n\n### Response:\n" + x["output"]
+}})
+print(f"Dataset: {{len(dataset)}} exemplos.", flush=True)
+
+trainer = SFTTrainer(
+    model=model,
+    processing_class=tokenizer,
+    train_dataset=dataset,
+    args=SFTConfig(
+        dataset_text_field="text",
+        max_length={max_seq_len},
+        per_device_train_batch_size=1,
+        gradient_accumulation_steps=8,
+        warmup_steps=100,
+        num_train_epochs={epochs},
+        learning_rate={lr},
+        fp16=False,
+        bf16=True,
+        output_dir="{output_dir}",
+        save_steps=100,
+        logging_steps=10,
+        report_to="none",
+    ),
+)
+
+print("Iniciando fine-tuning...", flush=True)
+trainer.train()
+
+print("Salvando adapter...", flush=True)
+model.save_pretrained("{adapter_path}")
+tokenizer.save_pretrained("{adapter_path}")
+print("NEXUS_TRAINING_COMPLETE", flush=True)
+"####
     )
 }
 
 fn sanitize_str(s: &str) -> String {
     s.replace('\\', "/").replace('"', "_").replace('\'', "_")
+}
+
+fn resolve_model_path(base_model: &str) -> String {
+    let path = Path::new(base_model);
+    let looks_like_path = path.is_absolute()
+        || base_model.starts_with("./")
+        || base_model.starts_with("../")
+        || base_model.starts_with('/')
+        || base_model.contains('\\')
+        || base_model.contains(':');
+    if looks_like_path {
+        base_model.to_string()
+    } else {
+        "/home/dulan/.cache/huggingface/hub/models--unsloth--mistral-7b-instruct-v0.3-bnb-4bit/snapshots/d5f623888f1415cf89b5c208d09cb620694618ee".to_string()
+    }
 }
 
 pub fn compute_adapter_checksum(adapter_dir: &Path) -> Result<String> {
@@ -235,3 +268,7 @@ fn parse_log_line(line: &str) -> Option<LogEntry> {
         loss: v.get("loss").and_then(|l| l.as_f64()).map(|l| l as f32),
     })
 }
+
+
+
+

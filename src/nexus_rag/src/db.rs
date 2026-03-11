@@ -35,7 +35,7 @@ pub async fn connect() -> Result<PgPool> {
         .map_err(|_| NexusError::EnvVar("KB_READER_PASSWORD".to_string()))?;
 
     let host = std::env::var("POSTGRES_HOST").unwrap_or_else(|_| "localhost".to_string());
-    let port = std::env::var("POSTGRES_PORT").unwrap_or_else(|_| "5432".to_string());
+    let port = std::env::var("POSTGRES_PORT").unwrap_or_else(|_| "5433".to_string());
     // FIX 1: default is "knowledge_base", not "nexus"
     let db = std::env::var("POSTGRES_DB").unwrap_or_else(|_| "knowledge_base".to_string());
     let user = std::env::var("POSTGRES_USER").unwrap_or_else(|_| "kb_reader".to_string());

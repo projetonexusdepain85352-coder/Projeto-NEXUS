@@ -19,7 +19,7 @@ use crate::error::{MtpError, Result};
 const DEFAULT_BASE_MODEL: &str = "mistralai/Mistral-7B-Instruct-v0.3";
 const DEFAULT_MAX_SEQ_LEN: u32 = 2048;
 const DATASETS_DIR: &str = "./datasets";
-const MODELS_DIR: &str = "/opt/nexus/models";
+const DEFAULT_MODELS_DIR: &str = "/opt/nexus/models";
 
 const DEFAULT_STAGE_A_MIN_SECURITY: i64 = 35;
 const DEFAULT_STAGE_A_MIN_RUST: i64 = 80;
@@ -222,10 +222,12 @@ async fn cmd_train(
         db::create_training_cycle(pool, domain, &base_model, &config, dataset_size).await?;
     info!("Ciclo criado: {}", cycle_id);
 
+    let models_dir = resolve_models_dir();
+
     let ts = chrono::Utc::now().format("%Y%m%d_%H%M%S");
     let model_name = format!("nexus-{}-{}", domain, ts);
-    let output_dir = PathBuf::from(MODELS_DIR).join("training").join(&model_name);
-    let adapter_dir = PathBuf::from(MODELS_DIR).join("adapters").join(&model_name);
+    let output_dir = models_dir.join("training").join(&model_name);
+    let adapter_dir = models_dir.join("adapters").join(&model_name);
 
     let job = trainer::TrainJob {
         base_model: base_model.clone(),
@@ -238,7 +240,7 @@ async fn cmd_train(
         learning_rate: 2e-4,
         output_dir: output_dir.clone(),
         adapter_path: adapter_dir.clone(),
-        models_dir: PathBuf::from(MODELS_DIR),
+        models_dir: models_dir.clone(),
     };
 
     println!("\nIniciando treinamento...");
@@ -260,7 +262,7 @@ async fn cmd_train(
     db::complete_training_cycle(pool, cycle_id, result.final_loss).await?;
 
     let adapter_rel = adapter_dir
-        .strip_prefix(MODELS_DIR)
+        .strip_prefix(&models_dir)
         .unwrap_or(&adapter_dir)
         .to_string_lossy()
         .to_string();
@@ -291,7 +293,8 @@ async fn cmd_benchmark(pool: &sqlx::PgPool, model_id: Uuid) -> Result<()> {
     let model = db::get_model(pool, model_id).await?;
     println!("=== Benchmark: {} ({}) ===", model.name, model.domain);
 
-    let adapter_full = PathBuf::from(MODELS_DIR).join(model.adapter_path.as_deref().unwrap_or(""));
+    let models_dir = resolve_models_dir();
+    let adapter_full = models_dir.join(model.adapter_path.as_deref().unwrap_or(""));
 
     let score = benchmark::run_benchmark(
         pool,
@@ -314,7 +317,8 @@ async fn cmd_deploy(pool: &sqlx::PgPool, model_id: Uuid) -> Result<()> {
         return Err(MtpError::NotApproved(model.status));
     }
 
-    let adapter_full = PathBuf::from(MODELS_DIR).join(model.adapter_path.as_deref().unwrap_or(""));
+    let models_dir = resolve_models_dir();
+    let adapter_full = models_dir.join(model.adapter_path.as_deref().unwrap_or(""));
     if !adapter_full.exists() {
         return Err(MtpError::AdapterNotFound(
             adapter_full.to_string_lossy().to_string(),
@@ -326,7 +330,7 @@ async fn cmd_deploy(pool: &sqlx::PgPool, model_id: Uuid) -> Result<()> {
         info!("{} modelo(s) anterior(es) arquivado(s).", archived);
     }
 
-    let domain_dir = PathBuf::from(MODELS_DIR).join(&model.domain);
+    let domain_dir = models_dir.join(&model.domain);
     let symlink_path = domain_dir.join("current");
     fs::create_dir_all(&domain_dir)?;
     if symlink_path.exists() || symlink_path.is_symlink() {
@@ -485,12 +489,42 @@ fn resolve_base_model(cli_base_model: &str) -> String {
         _ => cli_base_model.to_string(),
     }
 }
+
+fn resolve_models_dir() -> PathBuf {
+    std::env::var("NEXUS_MODELS_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from(DEFAULT_MODELS_DIR))
+}
+
 fn build_db_url() -> Result<String> {
     let pw = std::env::var("KB_INGEST_PASSWORD")?;
+    let host = std::env::var("POSTGRES_HOST").unwrap_or_else(|_| "localhost".to_string());
+    let port = std::env::var("POSTGRES_PORT").unwrap_or_else(|_| "5433".to_string());
+    let db = std::env::var("POSTGRES_DB").unwrap_or_else(|_| "knowledge_base".to_string());
+    let user = std::env::var("POSTGRES_INGEST_USER")
+        .or_else(|_| std::env::var("POSTGRES_USER"))
+        .unwrap_or_else(|_| "kb_ingest".to_string());
+    let encoded_pw = url_encode(&pw);
     Ok(format!(
-        "postgres://kb_ingest:{}@localhost:5432/knowledge_base",
-        pw
+        "postgres://{}:{}@{}:{}/{}",
+        user, encoded_pw, host, port, db
     ))
+}
+
+fn url_encode(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() * 3);
+    for b in s.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(b as char)
+            }
+            _ => {
+                out.push('%');
+                out.push_str(&format!("{:02X}", b));
+            }
+        }
+    }
+    out
 }
 
 fn count_jsonl_lines(path: &PathBuf) -> Result<usize> {
