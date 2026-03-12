@@ -1,4 +1,4 @@
-﻿# NEXUS RAG Query API
+# NEXUS RAG Query API
 
 ## Visao geral
 O `nexus_rag` expõe uma interface CLI para indexacao e consulta grounded.
@@ -76,3 +76,8 @@ nexus_rag query "como funciona borrow checker" --domain rust --top 5
 
 nexus_rag status
 ```
+
+## Metrics
+- Endpoint: `http://127.0.0.1:9898/metrics` (default)
+- Override com `NEXUS_METRICS_ADDR` (ex: `0.0.0.0:9898`).
+- Counter: `nexus_rag_queries_total{result="found|denied|below_threshold"}`

@@ -146,3 +146,12 @@ curl -s -X POST http://127.0.0.1:8787/api/auth/google \
 curl -s http://127.0.0.1:8787/api/services \
   -H "Authorization: Bearer $TOKEN"
 ```
+
+### GET /metrics
+Resposta: 200 (text/plain; version=0.0.4)
+Exposicao Prometheus com counters:
+- `nexus_documents_ingested_total`
+- `nexus_documents_validated_total{result="approved|rejected"}`
+- `nexus_rag_queries_total{result="found|denied|below_threshold"}`
+- `nexus_models_trained_total{result="approved|rejected"}`
+- `nexus_http_requests_total{method,path,status}`

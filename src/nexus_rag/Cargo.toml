@@ -26,6 +26,7 @@ tracing           = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter", "fmt", "ansi", "json"] }
 async-trait      = "0.1.80"
 
+prometheus-client = "0.22"
 [features]
 default = []
 test-mocks = []

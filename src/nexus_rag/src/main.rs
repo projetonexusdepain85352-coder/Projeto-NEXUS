@@ -8,6 +8,7 @@ mod error;
 mod indexer;
 mod qdrant_builder;
 mod query;
+mod metrics;
 
 // FIX 3: todos os imports no topo — sem `use` dentro de funções,
 // sem duplicatas entre run_status() e count_distinct_docs().
@@ -96,6 +97,7 @@ async fn shutdown_signal() {
 #[tokio::main]
 async fn main() {
     init_logging();
+    metrics::spawn_metrics_server();
     let cli = Cli::parse();
 
     let result = tokio::select! {

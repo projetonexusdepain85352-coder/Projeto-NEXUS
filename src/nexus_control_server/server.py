@@ -4,6 +4,7 @@ import os
 import re
 import secrets
 import signal
+import socket
 import hashlib
 import subprocess
 import sys
@@ -50,6 +51,12 @@ SERVICE_MUTATION_RATE_LIMIT_MAX = 60
 LOGS_RATE_LIMIT_MAX = 120
 RATE_LIMITS = {}
 RATE_LIMITS_LOCK = threading.Lock()
+METRICS_LOCK = threading.Lock()
+HTTP_REQUESTS = {}
+DOCUMENTS_INGESTED_TOTAL = 0
+DOCUMENTS_VALIDATED_TOTAL = {"approved": 0, "rejected": 0}
+RAG_QUERIES_TOTAL = {"found": 0, "denied": 0, "below_threshold": 0}
+MODELS_TRAINED_TOTAL = {"approved": 0, "rejected": 0}
 FRONTEND_DIR = Path(__file__).resolve().parent / "frontend"
 FRONTEND_INDEX_PATH = FRONTEND_DIR / "index.html"
 FRONTEND_CSS_PATH = FRONTEND_DIR / "styles.css"
@@ -60,6 +67,57 @@ FRONTEND_JS_PATH = FRONTEND_DIR / "app.js"
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
+def _metric_escape(value: str) -> str:
+    return str(value).replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
+
+def _metric_label_set(**labels) -> str:
+    if not labels:
+        return ""
+    parts = [f"{k}=\"{_metric_escape(v)}\"" for k, v in labels.items()]
+    return "{" + ",".join(parts) + "}"
+
+def _record_http_request(handler: BaseHTTPRequestHandler, code: int) -> None:
+    try:
+        method = (handler.command or "GET").upper()
+        path = urlparse(handler.path).path
+        status = str(code)
+    except Exception:
+        return
+
+    key = (method, path, status)
+    with METRICS_LOCK:
+        HTTP_REQUESTS[key] = HTTP_REQUESTS.get(key, 0) + 1
+
+def render_metrics() -> str:
+    lines = []
+    lines.append("# HELP nexus_documents_ingested_total Total de documentos ingeridos")
+    lines.append("# TYPE nexus_documents_ingested_total counter")
+    lines.append("# HELP nexus_documents_validated_total Total de documentos validados")
+    lines.append("# TYPE nexus_documents_validated_total counter")
+    lines.append("# HELP nexus_rag_queries_total Total de queries RAG")
+    lines.append("# TYPE nexus_rag_queries_total counter")
+    lines.append("# HELP nexus_models_trained_total Total de modelos treinados")
+    lines.append("# TYPE nexus_models_trained_total counter")
+    lines.append("# HELP nexus_http_requests_total Total de requisicoes HTTP")
+    lines.append("# TYPE nexus_http_requests_total counter")
+
+    with METRICS_LOCK:
+        lines.append(f"nexus_documents_ingested_total {DOCUMENTS_INGESTED_TOTAL}")
+        for result in sorted(DOCUMENTS_VALIDATED_TOTAL.keys()):
+            count = DOCUMENTS_VALIDATED_TOTAL.get(result, 0)
+            lines.append(f"nexus_documents_validated_total{_metric_label_set(result=result)} {count}")
+        for result in sorted(RAG_QUERIES_TOTAL.keys()):
+            count = RAG_QUERIES_TOTAL.get(result, 0)
+            lines.append(f"nexus_rag_queries_total{_metric_label_set(result=result)} {count}")
+        for result in sorted(MODELS_TRAINED_TOTAL.keys()):
+            count = MODELS_TRAINED_TOTAL.get(result, 0)
+            lines.append(f"nexus_models_trained_total{_metric_label_set(result=result)} {count}")
+        for (method, path, status), count in sorted(HTTP_REQUESTS.items()):
+            lines.append(
+                f"nexus_http_requests_total{_metric_label_set(method=method, path=path, status=status)} {count}"
+            )
+
+    return "\n".join(lines) + "\n"
 
 def read_json(path: Path, default):
     if not path.exists():
@@ -815,6 +873,7 @@ def _send_security_headers(handler: BaseHTTPRequestHandler, is_html: bool = Fals
 def json_response(handler: BaseHTTPRequestHandler, code: int, payload, extra_headers: dict | None = None):
     raw = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     handler.send_response(code)
+    _record_http_request(handler, code)
     _send_security_headers(handler, is_html=False, extra_headers=extra_headers)
     handler.send_header("Content-Type", "application/json; charset=utf-8")
     handler.send_header("Content-Length", str(len(raw)))
@@ -825,6 +884,7 @@ def json_response(handler: BaseHTTPRequestHandler, code: int, payload, extra_hea
 def text_response(handler: BaseHTTPRequestHandler, code: int, text: str, content_type: str, extra_headers: dict | None = None):
     raw = text.encode("utf-8")
     handler.send_response(code)
+    _record_http_request(handler, code)
     _send_security_headers(handler, is_html=content_type.startswith("text/html"), extra_headers=extra_headers)
     handler.send_header("Content-Type", content_type)
     handler.send_header("Content-Length", str(len(raw)))
@@ -946,6 +1006,15 @@ def make_handler(manager: ServiceManager):
                     if js is None:
                         return json_response(self, 404, {"error": "asset nao encontrado"})
                     return text_response(self, 200, js, "application/javascript; charset=utf-8")
+
+                if parsed.path == "/metrics":
+                    body = render_metrics()
+                    return text_response(
+                        self,
+                        200,
+                        body,
+                        "text/plain; version=0.0.4; charset=utf-8",
+                    )
 
                 if parsed.path == "/api/health":
                     return json_response(self, 200, {"status": "ok", "time": now_iso()})

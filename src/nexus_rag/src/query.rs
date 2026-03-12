@@ -10,6 +10,7 @@ use qdrant_client::qdrant::{ScoredPoint, SearchPointsBuilder, Value, value::Kind
 use crate::embedder::Embedder;
 use crate::error::{NexusError, Result, qdrant_err};
 use crate::indexer::collection_name;
+use crate::metrics;
 
 const MAX_QUERY_CHARS: usize = 4096;
 const STRICT_MIN_SCORE: f32 = 0.35;
@@ -210,6 +211,7 @@ pub async fn run_query_with<C: QdrantSearch + Sync, E: EmbeddingProvider>(
 
     if raw_results.is_empty() {
         println!("GROUNDING_DENIED: no evidence found in database for this query.");
+        metrics::inc_query("denied");
         return Err(NexusError::Ungrounded(
             "No vector evidence available for query".to_string(),
         ));
@@ -231,6 +233,7 @@ pub async fn run_query_with<C: QdrantSearch + Sync, E: EmbeddingProvider>(
             "GROUNDING_DENIED: evidence exists but below strict score threshold ({:.2}).",
             STRICT_MIN_SCORE
         );
+        metrics::inc_query("below_threshold");
         return Err(NexusError::Ungrounded(format!(
             "No evidence >= min score {:.2}",
             STRICT_MIN_SCORE
@@ -242,6 +245,7 @@ pub async fn run_query_with<C: QdrantSearch + Sync, E: EmbeddingProvider>(
     if results.iter().any(|r| r.document_id.trim().is_empty()) {
         tracing::warn!("Qdrant result missing document_id metadata");
         println!("GROUNDING_DENIED: evidence without document_id metadata.");
+        metrics::inc_query("denied");
         return Err(NexusError::Ungrounded(
             "Evidence missing document_id metadata".to_string(),
         ));
@@ -279,6 +283,7 @@ pub async fn run_query_with<C: QdrantSearch + Sync, E: EmbeddingProvider>(
     }
 
     println!();
+    metrics::inc_query("found");
     Ok(results)
 }
 
