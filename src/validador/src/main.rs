@@ -1,8 +1,10 @@
 use chrono::Local;
 use postgres::{Client, NoTls};
 use std::collections::HashSet;
+use std::error::Error;
+use std::fmt;
 use std::fs::{self, OpenOptions};
-use std::io::{self, BufRead, Write};
+use std::io::{self, BufRead, Read, Write};
 use std::sync::{
     Arc,
     atomic::{AtomicBool, Ordering},
@@ -786,15 +788,15 @@ const SESSION_STATE_FILE: &str = "nexus_session_state.json";
 // ESTRUTURAS DE DADOS
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-struct Documento {
-    id: String,
-    source: String,
-    domain: String,
-    doc_type: String,
-    content_length: i32,
-    preview: String,
-    content: String,
-    head: String,
+pub struct Documento {
+    pub id: String,
+    pub source: String,
+    pub domain: String,
+    pub doc_type: String,
+    pub content_length: i32,
+    pub preview: String,
+    pub content: String,
+    pub head: String,
 }
 
 enum Acao {
@@ -805,7 +807,7 @@ enum Acao {
 }
 
 struct HistoricoItem {
-    id: String,
+    pub id: String,
     acao: Acao,
 }
 
@@ -818,18 +820,259 @@ struct EstadoSessao {
 }
 
 #[derive(PartialEq)]
-enum Categoria {
+pub enum Categoria {
     Util,
     Inutil,
 }
 
-struct Sugestao {
-    categoria: Categoria,
-    confianca: u8,
-    motivo: String,
+#[derive(Debug, Clone, PartialEq)]
+pub struct Sugestao {
+    pub categoria: Categoria,
+    pub confianca: u8,
+    pub motivo: String,
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+#[derive(Debug, Clone, PartialEq)]
+pub enum ValidationStatus {
+    Pending,
+    Approved,
+    Rejected,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ValidationDecision {
+    Approve,
+    Reject { reason: String },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ValidationError {
+    EmptyDocument,
+    MalformedDocument(String),
+    NotPending(ValidationStatus),
+    Store(String),
+}
+
+impl fmt::Display for ValidationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ValidationError::EmptyDocument => write!(f, "documento vazio"),
+            ValidationError::MalformedDocument(msg) => write!(f, "documento malformado: {}", msg),
+            ValidationError::NotPending(status) => write!(f, "status invalido para decisao: {:?}", status),
+            ValidationError::Store(msg) => write!(f, "erro de persistencia: {}", msg),
+        }
+    }
+}
+
+impl Error for ValidationError {}
+
+pub trait ValidationStore {
+    fn get_status(&mut self, doc_id: &str) -> Result<ValidationStatus, ValidationError>;
+    fn update_status(
+        &mut self,
+        doc_id: &str,
+        status: ValidationStatus,
+        decided_by: &str,
+        reason: Option<&str>,
+    ) -> Result<(), ValidationError>;
+}
+
+impl ValidationStore for Client {
+    fn get_status(&mut self, doc_id: &str) -> Result<ValidationStatus, ValidationError> {
+        let row = self
+            .query_opt(
+                "SELECT status FROM validation WHERE document_id::text = $1",
+                &[&doc_id],
+            )
+            .map_err(|e| ValidationError::Store(e.to_string()))?;
+        let status: String = row
+            .ok_or_else(|| ValidationError::MalformedDocument("status nao encontrado".to_string()))?
+            .get(0);
+        match status.as_str() {
+            "pending" => Ok(ValidationStatus::Pending),
+            "approved" => Ok(ValidationStatus::Approved),
+            "rejected" => Ok(ValidationStatus::Rejected),
+            other => Err(ValidationError::MalformedDocument(format!(
+                "status desconhecido: {}",
+                other
+            ))),
+        }
+    }
+
+    fn update_status(
+        &mut self,
+        doc_id: &str,
+        status: ValidationStatus,
+        decided_by: &str,
+        reason: Option<&str>,
+    ) -> Result<(), ValidationError> {
+        match status {
+            ValidationStatus::Approved => {
+                self
+                    .execute(
+                        "UPDATE validation SET status = 'approved', decided_by = $2, decided_at = NOW(), rejection_reason = NULL WHERE document_id::text = $1",
+                        &[&doc_id, &decided_by],
+                    )
+                    .map_err(|e| ValidationError::Store(e.to_string()))?;
+            }
+            ValidationStatus::Rejected => {
+                let motivo = reason.unwrap_or("");
+                self
+                    .execute(
+                        "UPDATE validation SET status = 'rejected', decided_by = $2, rejection_reason = $3, decided_at = NOW() WHERE document_id::text = $1",
+                        &[&doc_id, &decided_by, &motivo],
+                    )
+                    .map_err(|e| ValidationError::Store(e.to_string()))?;
+            }
+            ValidationStatus::Pending => {
+                return Err(ValidationError::MalformedDocument(
+                    "nao e permitido persistir como pending".to_string(),
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+pub fn apply_decision<S: ValidationStore>(
+    store: &mut S,
+    doc_id: &str,
+    decision: ValidationDecision,
+    decided_by: &str,
+) -> Result<ValidationStatus, ValidationError> {
+    let current = store.get_status(doc_id)?;
+    if current != ValidationStatus::Pending {
+        return Err(ValidationError::NotPending(current));
+    }
+
+    match decision {
+        ValidationDecision::Approve => {
+            store.update_status(doc_id, ValidationStatus::Approved, decided_by, None)?;
+            Ok(ValidationStatus::Approved)
+        }
+        ValidationDecision::Reject { reason } => {
+            if reason.trim().is_empty() {
+                return Err(ValidationError::MalformedDocument(
+                    "motivo de rejeicao vazio".to_string(),
+                ));
+            }
+            store.update_status(
+                doc_id,
+                ValidationStatus::Rejected,
+                decided_by,
+                Some(&reason),
+            )?;
+            Ok(ValidationStatus::Rejected)
+        }
+    }
+}
+
+pub fn validate_document_input(doc: &Documento) -> Result<(), ValidationError> {
+    if doc.id.trim().is_empty() {
+        return Err(ValidationError::MalformedDocument("id vazio".to_string()));
+    }
+    if doc.source.trim().is_empty() {
+        return Err(ValidationError::MalformedDocument("source vazio".to_string()));
+    }
+    if doc.domain.trim().is_empty() {
+        return Err(ValidationError::MalformedDocument("domain vazio".to_string()));
+    }
+    if doc.content.trim().is_empty() {
+        return Err(ValidationError::EmptyDocument);
+    }
+    Ok(())
+}
+
+pub trait SuggestionProvider {
+    fn suggest(&self, doc: &Documento) -> Result<Sugestao, ValidationError>;
+}
+
+pub struct SugestorSocketProvider {
+    socket_path: String,
+}
+
+impl SugestorSocketProvider {
+    pub fn from_env() -> Option<Self> {
+        let socket_path = std::env::var("NEXUS_SUGESTOR_SOCKET").ok()?;
+        if socket_path.trim().is_empty() {
+            None
+        } else {
+            Some(Self { socket_path })
+        }
+    }
+}
+
+impl SuggestionProvider for SugestorSocketProvider {
+    fn suggest(&self, doc: &Documento) -> Result<Sugestao, ValidationError> {
+        #[cfg(not(unix))]
+        {
+            let _ = doc;
+            return Err(ValidationError::Store(
+                "sugestor socket indisponivel nesta plataforma".to_string(),
+            ));
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::net::UnixStream;
+            let mut stream = UnixStream::connect(&self.socket_path)
+                .map_err(|e| ValidationError::Store(format!("sugestor connect: {}", e)))?;
+            let payload = serde_json::json!({
+                "domain": doc.domain,
+                "content": doc.content,
+            });
+            let msg = format!("{}\n", payload);
+            stream
+                .write_all(msg.as_bytes())
+                .map_err(|e| ValidationError::Store(format!("sugestor write: {}", e)))?;
+            let mut resp = String::new();
+            stream
+                .read_to_string(&mut resp)
+                .map_err(|e| ValidationError::Store(format!("sugestor read: {}", e)))?;
+            let parsed: serde_json::Value = serde_json::from_str(resp.trim())
+                .map_err(|e| ValidationError::Store(format!("sugestor parse: {}", e)))?;
+            let util = parsed["util"].as_bool().unwrap_or(false);
+            let confianca = parsed["confianca"].as_u64().unwrap_or(0) as u8;
+            let motivo = parsed["motivo"].as_str().unwrap_or("sem motivo").to_string();
+            Ok(Sugestao {
+                categoria: if util { Categoria::Util } else { Categoria::Inutil },
+                confianca,
+                motivo,
+            })
+        }
+    }
+}
+
+pub fn obter_sugestao(
+    provider: &dyn SuggestionProvider,
+    doc: &Documento,
+) -> Result<Sugestao, ValidationError> {
+    provider.suggest(doc)
+}
+
+pub fn formatar_sugestao(s: &Sugestao) -> String {
+    let barras = (s.confianca / 10) as usize;
+    let barra = format!("{}{}", "â–ˆ".repeat(barras), "â–‘".repeat(10 - barras));
+    let linhas_motivo = quebrar_motivo(&s.motivo, 56);
+    let (icone, label) = if s.categoria == Categoria::Util {
+        ("âœ“", "UTIL  ")
+    } else {
+        ("âœ—", "INUTEL")
+    };
+
+    let mut out = String::new();
+    out.push_str("  â”Œâ”€ SUGESTAO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”\n");
+    out.push_str(&format!(
+        "  â”‚  {} {}   Confianca: {}% [{}]  â”‚\n",
+        icone, label, s.confianca, barra
+    ));
+    out.push_str("  â”‚                                                              â”‚\n");
+    for l in &linhas_motivo {
+        let p = 56usize.saturating_sub(largura_visual(l));
+        out.push_str(&format!("  â”‚  {}{}  â”‚\n", l, " ".repeat(p)));
+    }
+    out.push_str("  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜\n");
+    out
+}// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // PERSISTÃŠNCIA DE SESSÃƒO (TXT â€” pulados)
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -1249,25 +1492,7 @@ fn quebrar_motivo(texto: &str, largura: usize) -> Vec<String> {
 }
 
 fn exibir_sugestao(s: &Sugestao) {
-    let barras = (s.confianca / 10) as usize;
-    let barra = format!("{}{}", "â–ˆ".repeat(barras), "â–‘".repeat(10 - barras));
-    let linhas_motivo = quebrar_motivo(&s.motivo, 56);
-    let (icone, label) = if s.categoria == Categoria::Util {
-        ("âœ“", "UTIL  ")
-    } else {
-        ("âœ—", "INUTEL")
-    };
-    println!("  â”Œâ”€ SUGESTAO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”");
-    println!(
-        "  â”‚  {} {}   Confianca: {}% [{}]  â”‚",
-        icone, label, s.confianca, barra
-    );
-    println!("  â”‚                                                              â”‚");
-    for l in &linhas_motivo {
-        let p = 56usize.saturating_sub(largura_visual(l));
-        println!("  â”‚  {}{}  â”‚", l, " ".repeat(p));
-    }
-    println!("  â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜");
+    println!("{}", formatar_sugestao(s));
 }
 
 fn exibir_estatisticas(
@@ -1376,7 +1601,7 @@ fn exibir_conteudo_completo(conteudo: &str, source: &str, stdin: &io::Stdin) {
 
 fn exibir_conteudo_completo_rx(
     conteudo: &str,
-    source: &str,
+    pub source: &str,
     rx: &std::sync::mpsc::Receiver<String>,
 ) {
     let linhas_conteudo: Vec<&str> = conteudo.lines().collect();
@@ -1519,6 +1744,11 @@ fn sugerir_ia(dominio: &str, conteudo: &str, timeout_s: u64) -> Option<Sugestao>
 }
 
 fn sugerir_com_ia(doc: &Documento) -> Sugestao {
+    if let Some(provider) = SugestorSocketProvider::from_env() {
+        if let Ok(s) = obter_sugestao(&provider, doc) {
+            return s;
+        }
+    }
     sugerir_ia(&doc.domain, &doc.content, 30).unwrap_or_else(|| sugerir_heuristica_interna(doc))
 }
 
@@ -2163,13 +2393,13 @@ fn sugerir_heuristica_interna(doc: &Documento) -> Sugestao {
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 struct DocClassificado {
-    id: String,
-    source: String,
-    domain: String,
+    pub id: String,
+    pub source: String,
+    pub domain: String,
     status: String,
     tags: Vec<String>,
     #[allow(dead_code)]
-    content_length: i32,
+    pub content_length: i32,
 }
 
 fn db_salvar_tags(client: &mut Client, id: &str, tags: &[String]) {
@@ -3587,4 +3817,12 @@ fn main() {
         }
     }
 }
+
+
+
+
+
+
+
+
 
