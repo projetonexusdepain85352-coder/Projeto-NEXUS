@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
 
-
 // FIX 3: todos os imports no topo — sem `use` dentro de funções,
 // sem duplicatas entre run_status() e count_distinct_docs().
 use std::collections::{BTreeSet, HashMap, HashSet};
@@ -11,10 +10,10 @@ use qdrant_client::qdrant::{PayloadIncludeSelector, PointId, ScrollPointsBuilder
 use tokio::signal;
 use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
-use nexus_rag::{approval, db, indexer, qdrant_builder, query};
 use nexus_rag::error;
 use nexus_rag::error::{NexusError, Result};
 use nexus_rag::metrics;
+use nexus_rag::{approval, db, indexer, qdrant_builder, query};
 
 // ── CLI ───────────────────────────────────────────────────────────────────────
 

@@ -109,4 +109,3 @@ fn handle_connection(mut stream: TcpStream) {
     );
     let _ = stream.write_all(resp.as_bytes());
 }
-

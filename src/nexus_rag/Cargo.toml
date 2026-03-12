@@ -13,7 +13,7 @@ path = "src/main.rs"
 [dependencies]
 clap              = { version = "4.5.20",  features = ["derive"] }
 tokio             = { version = "1.40.0",  features = ["full", "signal"] }
-sqlx              = { version = "0.8.2",   features = ["postgres", "runtime-tokio", "tls-rustls", "uuid", "chrono"] }
+sqlx = { version = "0.8.2", default-features = false, features = ["postgres", "runtime-tokio", "tls-rustls", "uuid", "chrono"] }
 qdrant-client     = "1.12.1"
 fastembed         = "4.3.0"
 serde             = { version = "1.0.210", features = ["derive"] }

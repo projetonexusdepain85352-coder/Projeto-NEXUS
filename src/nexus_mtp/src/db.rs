@@ -1,11 +1,12 @@
 use chrono::{DateTime, Utc};
 use serde_json::Value as JsonValue;
-use sqlx::PgPool;
+use sqlx::postgres::PgRow;
+use sqlx::{PgPool, Row};
 use uuid::Uuid;
 
 use crate::error::Result;
 
-#[derive(Debug, sqlx::FromRow, Clone)]
+#[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub struct ApprovedDocument {
     pub id: Uuid,
@@ -14,7 +15,7 @@ pub struct ApprovedDocument {
     pub domain: String,
 }
 
-#[derive(Debug, sqlx::FromRow)]
+#[derive(Debug)]
 pub struct ModelRow {
     pub id: Uuid,
     pub name: String,
@@ -32,7 +33,7 @@ pub struct ModelRow {
     pub deployed_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, sqlx::FromRow)]
+#[derive(Debug)]
 pub struct DomainStats {
     pub domain: String,
     pub approved_docs: i64,
@@ -40,12 +41,66 @@ pub struct DomainStats {
     pub total_models: i64,
 }
 
-#[derive(Debug, sqlx::FromRow)]
+#[derive(Debug)]
 pub struct DomainValidationStats {
     pub domain: String,
     pub pending_docs: i64,
     pub approved_docs: i64,
     pub rejected_docs: i64,
+}
+
+impl<'r> sqlx::FromRow<'r, PgRow> for ApprovedDocument {
+    fn from_row(row: &'r PgRow) -> std::result::Result<Self, sqlx::Error> {
+        Ok(Self {
+            id: row.try_get("id")?,
+            content: row.try_get("content")?,
+            source: row.try_get("source")?,
+            domain: row.try_get("domain")?,
+        })
+    }
+}
+
+impl<'r> sqlx::FromRow<'r, PgRow> for ModelRow {
+    fn from_row(row: &'r PgRow) -> std::result::Result<Self, sqlx::Error> {
+        Ok(Self {
+            id: row.try_get("id")?,
+            name: row.try_get("name")?,
+            domain: row.try_get("domain")?,
+            base_model: row.try_get("base_model")?,
+            status: row.try_get("status")?,
+            dataset_size: row.try_get("dataset_size")?,
+            training_steps: row.try_get("training_steps")?,
+            benchmark_score: row.try_get("benchmark_score")?,
+            adapter_checksum: row.try_get("adapter_checksum")?,
+            adapter_path: row.try_get("adapter_path")?,
+            training_cycle_id: row.try_get("training_cycle_id")?,
+            created_at: row.try_get("created_at")?,
+            approved_at: row.try_get("approved_at")?,
+            deployed_at: row.try_get("deployed_at")?,
+        })
+    }
+}
+
+impl<'r> sqlx::FromRow<'r, PgRow> for DomainStats {
+    fn from_row(row: &'r PgRow) -> std::result::Result<Self, sqlx::Error> {
+        Ok(Self {
+            domain: row.try_get("domain")?,
+            approved_docs: row.try_get("approved_docs")?,
+            used_in_training: row.try_get("used_in_training")?,
+            total_models: row.try_get("total_models")?,
+        })
+    }
+}
+
+impl<'r> sqlx::FromRow<'r, PgRow> for DomainValidationStats {
+    fn from_row(row: &'r PgRow) -> std::result::Result<Self, sqlx::Error> {
+        Ok(Self {
+            domain: row.try_get("domain")?,
+            pending_docs: row.try_get("pending_docs")?,
+            approved_docs: row.try_get("approved_docs")?,
+            rejected_docs: row.try_get("rejected_docs")?,
+        })
+    }
 }
 pub async fn fetch_approved_documents(
     pool: &PgPool,

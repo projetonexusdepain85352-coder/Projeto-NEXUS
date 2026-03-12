@@ -3,16 +3,15 @@
 //! Thread-safety: `PgPool` is Clone + Send + Sync.
 
 use chrono::{DateTime, Utc};
-use sqlx::PgPool;
-use sqlx::postgres::PgPoolOptions;
+use sqlx::postgres::{PgPoolOptions, PgRow};
+use sqlx::{PgPool, Row};
 use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::error::{NexusError, Result};
 
 /// A row from `documents` joined with `validation`.
-#[derive(Debug, Clone, sqlx::FromRow)]
-#[allow(dead_code)] // fields read by sqlx::FromRow macro
+#[derive(Debug, Clone)]
 pub struct DocumentRecord {
     pub id: Uuid,
     pub source: String,
@@ -24,6 +23,20 @@ pub struct DocumentRecord {
     pub collected_at: DateTime<Utc>,
 }
 
+impl<'r> sqlx::FromRow<'r, PgRow> for DocumentRecord {
+    fn from_row(row: &'r PgRow) -> std::result::Result<Self, sqlx::Error> {
+        Ok(Self {
+            id: row.try_get("id")?,
+            source: row.try_get("source")?,
+            domain: row.try_get("domain")?,
+            doc_type: row.try_get("doc_type")?,
+            content: row.try_get("content")?,
+            content_length: row.try_get("content_length")?,
+            content_hash: row.try_get("content_hash")?,
+            collected_at: row.try_get("collected_at")?,
+        })
+    }
+}
 /// Builds a PostgreSQL connection pool for the `kb_reader` role.
 ///
 /// Required env var  : KB_READER_PASSWORD

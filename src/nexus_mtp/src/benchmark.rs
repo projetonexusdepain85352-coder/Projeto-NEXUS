@@ -1,16 +1,25 @@
-use sqlx::PgPool;
+use sqlx::postgres::PgRow;
+use sqlx::{PgPool, Row};
 use std::env;
 use tracing::{info, warn};
 use uuid::Uuid;
 
 use crate::error::{MtpError, Result};
 
-#[derive(Debug, sqlx::FromRow)]
+#[derive(Debug)]
 struct BenchmarkQuestion {
     question: String,
     expected_keywords: Vec<String>,
 }
 
+impl<'r> sqlx::FromRow<'r, PgRow> for BenchmarkQuestion {
+    fn from_row(row: &'r PgRow) -> std::result::Result<Self, sqlx::Error> {
+        Ok(Self {
+            question: row.try_get("question")?,
+            expected_keywords: row.try_get("expected_keywords")?,
+        })
+    }
+}
 pub const DEFAULT_BENCHMARK_MIN_SCORE: f32 = 0.7;
 
 pub fn benchmark_min_score() -> f32 {

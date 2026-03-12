@@ -9,4 +9,3 @@ pub mod indexer;
 pub mod metrics;
 pub mod qdrant_builder;
 pub mod query;
-
