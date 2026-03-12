@@ -1,18 +1,100 @@
-use sha2::{Sha256, Digest};
+﻿use sha2::{Sha256, Digest};
 use uuid::Uuid;
 use scraper::{Html, Selector};
 use std::collections::{HashSet, VecDeque};
+use std::time::Duration;
 
+pub type BoxError = Box<dyn std::error::Error + Send + Sync>;
+
+#[derive(Debug, Clone)]
+pub struct NewDocument<'a> {
+    pub url: &'a str,
+    pub domain: &'a str,
+    pub doc_type: &'a str,
+    pub content: &'a str,
+    pub hash: &'a str,
+}
+
+pub trait IngestTransaction {
+    fn insert_document(&mut self, doc: &NewDocument) -> Result<Uuid, BoxError>;
+    fn insert_validation(&mut self, document_id: Uuid) -> Result<(), BoxError>;
+    fn commit(self: Box<Self>) -> Result<(), BoxError>;
+    fn rollback(self: Box<Self>) -> Result<(), BoxError>;
+}
+
+pub trait IngestStore {
+    fn begin_tx(&mut self) -> Result<Box<dyn IngestTransaction + '_>, BoxError>;
+    fn get_hash_by_source(&mut self, url: &str) -> Result<Option<String>, BoxError>;
+    fn update_document(&mut self, url: &str, content: &str, hash: &str) -> Result<(), BoxError>;
+}
+
+impl IngestStore for postgres::Client {
+    fn begin_tx(&mut self) -> Result<Box<dyn IngestTransaction + '_>, BoxError> {
+        let tx = self.transaction()?;
+        Ok(Box::new(tx))
+    }
+
+    fn get_hash_by_source(&mut self, url: &str) -> Result<Option<String>, BoxError> {
+        let row = self.query_opt(
+            "SELECT content_hash FROM documents WHERE source = $1 ORDER BY collected_at DESC LIMIT 1",
+            &[&url],
+        )?;
+        Ok(row.map(|r| r.get(0)))
+    }
+
+    fn update_document(&mut self, url: &str, content: &str, hash: &str) -> Result<(), BoxError> {
+        let tamanho = content.len() as i32;
+        self.execute(
+            "UPDATE documents SET content = $1, content_hash = $2, content_length = $3, collected_at = NOW()\
+             WHERE source = $4",
+            &[&content, &hash, &tamanho, &url],
+        )?;
+        Ok(())
+    }
+}
+
+impl<'a> IngestTransaction for postgres::Transaction<'a> {
+    fn insert_document(&mut self, doc: &NewDocument) -> Result<Uuid, BoxError> {
+        let id = Uuid::new_v4();
+        let tamanho = doc.content.len() as i32;
+        self.execute(
+            "INSERT INTO documents (id, content, source, domain, doc_type, content_hash, content_length, inserted_by)\
+             VALUES ($1, $2, $3, $4, $5, $6, $7, 'agent')",
+            &[&id, &doc.content, &doc.url, &doc.domain, &doc.doc_type, &doc.hash, &tamanho],
+        )?;
+        Ok(id)
+    }
+
+    fn insert_validation(&mut self, document_id: Uuid) -> Result<(), BoxError> {
+        let val_id = Uuid::new_v4();
+        self.execute(
+            "INSERT INTO validation (id, document_id, status, decided_by)\
+             VALUES ($1, $2, 'pending', 'agent')",
+            &[&val_id, &document_id],
+        )?;
+        Ok(())
+    }
+
+    fn commit(self: Box<Self>) -> Result<(), BoxError> {
+        (*self).commit()?;
+        Ok(())
+    }
+
+    fn rollback(self: Box<Self>) -> Result<(), BoxError> {
+        (*self).rollback()?;
+        Ok(())
+    }
+}
 // =============================================================================
-// CONFIGURAÇÃO
+// CONFIGURAÃ‡ÃƒO
 // =============================================================================
 
-/// Configuração global do agente.
+/// ConfiguraÃ§Ã£o global do agente.
 struct Config {
     max_paginas: usize,
     max_profundidade: usize,
     delay_ms: u64,
-    // Limiares de qualidade — configuráveis sem recompilar
+    // Limiares de qualidade â€” configurÃ¡veis sem recompilar
     qualidade_min_bytes: usize,
     qualidade_max_duplicadas_pct: f64,
     qualidade_max_curtas_pct: f64,
@@ -38,7 +120,7 @@ impl Default for Config {
     }
 }
 
-/// Configuração por fonte — permite ajuste fino sem alterar o padrão global.
+/// ConfiguraÃ§Ã£o por fonte â€” permite ajuste fino sem alterar o padrÃ£o global.
 struct FonteConfig<'a> {
     url: &'a str,
     domain: &'a str,
@@ -112,15 +194,15 @@ fn url_parece_indice(url: &str) -> bool {
     PADROES_INDICE_URL.iter().any(|p| caminho.ends_with(p))
 }
 
-/// Normaliza URL para evitar duplicatas lógicas na fila BFS.
-/// Remove: fragmento #, parâmetros utm_*, trailing slash redundante.
+/// Normaliza URL para evitar duplicatas lÃ³gicas na fila BFS.
+/// Remove: fragmento #, parÃ¢metros utm_*, trailing slash redundante.
 fn canonicalizar_url(url: &str) -> String {
     // Remove fragmento
     let sem_fragmento = url.split('#').next().unwrap_or(url);
 
     // Faz parse para manipular query string
     if let Ok(mut parsed) = url::Url::parse(sem_fragmento) {
-        // Remove parâmetros de rastreamento
+        // Remove parÃ¢metros de rastreamento
         let params_filtrar = ["utm_source", "utm_medium", "utm_campaign",
                               "utm_term", "utm_content", "ref", "source"];
         let query_limpa: Vec<(String, String)> = parsed.query_pairs()
@@ -148,18 +230,27 @@ fn canonicalizar_url(url: &str) -> String {
 // DOWNLOAD COM RETRY
 // =============================================================================
 
-/// Resultado de download com informação sobre limite de tamanho excedido.
+/// Resultado de download com informaÃ§Ã£o sobre limite de tamanho excedido.
 
-/// Baixa conteúdo HTML com retry exponencial (até 3 tentativas).
+/// Baixa conteÃºdo HTML com retry exponencial (atÃ© 3 tentativas).
 /// Respeita Retry-After quando presente. Rejeita respostas > max_bytes.
-fn baixar_conteudo(url: &str, max_bytes: usize) -> Result<String, Box<dyn std::error::Error>> {
+fn baixar_conteudo(url: &str, max_bytes: usize) -> Result<String, BoxError> {
+    baixar_conteudo_com_config(url, max_bytes, Duration::from_secs(30), 3)
+}
+
+pub fn baixar_conteudo_com_config(
+    url: &str,
+    max_bytes: usize,
+    timeout: Duration,
+    max_tentativas: u32,
+) -> Result<String, BoxError> {
+    let max_tentativas = max_tentativas.max(1);
     let cliente = reqwest::blocking::Client::builder()
         .user_agent("NEXUS-Agent/0.1")
-        .timeout(std::time::Duration::from_secs(30))
+        .timeout(timeout)
         .build()?;
 
     let mut tentativa = 0;
-    let max_tentativas = 3;
 
     loop {
         tentativa += 1;
@@ -167,35 +258,50 @@ fn baixar_conteudo(url: &str, max_bytes: usize) -> Result<String, Box<dyn std::e
             Ok(resp) => {
                 let status = resp.status();
 
-                // Rate limit — aguarda se servidor indicar
+                // Rate limit â€” aguarda se servidor indicar
                 if status.as_u16() == 429 {
-                    let aguardar = resp.headers()
+                    let aguardar = resp
+                        .headers()
                         .get("retry-after")
                         .and_then(|v| v.to_str().ok())
                         .and_then(|s| s.parse::<u64>().ok())
                         .unwrap_or(30);
-                    eprintln!("  [RATE LIMIT] {} — aguardando {}s (tentativa {}/{})",
-                        url, aguardar, tentativa, max_tentativas);
-                    std::thread::sleep(std::time::Duration::from_secs(aguardar));
-                    if tentativa >= max_tentativas { break; }
+                    eprintln!(
+                        "  [RATE LIMIT] {} â€” aguardando {}s (tentativa {}/{})",
+                        url, aguardar, tentativa, max_tentativas
+                    );
+                    std::thread::sleep(Duration::from_secs(aguardar));
+                    if tentativa >= max_tentativas {
+                        break;
+                    }
                     continue;
                 }
 
-                // Erros de servidor — retry com backoff
-                if status.is_server_error() && tentativa < max_tentativas {
-                    let delay = 2u64.pow(tentativa as u32);
-                    eprintln!("  [ERRO HTTP {}] {} — retry em {}s", status, url, delay);
-                    std::thread::sleep(std::time::Duration::from_secs(delay));
-                    continue;
+                if status.is_client_error() {
+                    return Err(format!("HTTP {} ao baixar {}", status, url).into());
+                }
+
+                // Erros de servidor â€” retry com backoff
+                if status.is_server_error() {
+                    if tentativa < max_tentativas {
+                        let delay = 2u64.pow(tentativa as u32);
+                        eprintln!("  [ERRO HTTP {}] {} â€” retry em {}s", status, url, delay);
+                        std::thread::sleep(Duration::from_secs(delay));
+                        continue;
+                    }
+                    return Err(format!("HTTP {} ao baixar {}", status, url).into());
                 }
 
                 let conteudo = resp.text()?;
 
                 if conteudo.len() > max_bytes {
-                    return Err(format!(
-                        "Payload muito grande: {} bytes (limite {})",
-                        conteudo.len(), max_bytes
-                    ).into());
+                    return Err(
+                        format!(
+                            "Payload muito grande: {} bytes (limite {})",
+                            conteudo.len(), max_bytes
+                        )
+                        .into(),
+                    );
                 }
 
                 return Ok(conteudo);
@@ -203,8 +309,8 @@ fn baixar_conteudo(url: &str, max_bytes: usize) -> Result<String, Box<dyn std::e
             Err(e) => {
                 if tentativa < max_tentativas {
                     let delay = 2u64.pow(tentativa as u32);
-                    eprintln!("  [ERRO REDE] {} — retry em {}s: {}", url, delay, e);
-                    std::thread::sleep(std::time::Duration::from_secs(delay));
+                    eprintln!("  [ERRO REDE] {} â€” retry em {}s: {}", url, delay, e);
+                    std::thread::sleep(Duration::from_secs(delay));
                 } else {
                     return Err(e.into());
                 }
@@ -212,18 +318,27 @@ fn baixar_conteudo(url: &str, max_bytes: usize) -> Result<String, Box<dyn std::e
         }
     }
 
-    Err(format!("Falha após {} tentativas: {}", max_tentativas, url).into())
+    Err(format!("Falha apÃ³s {} tentativas: {}", max_tentativas, url).into())
 }
 
-/// Baixa bytes binários (PDFs) com retry e limite de tamanho.
-fn baixar_bytes(url: &str, max_bytes: usize) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+/// Baixa bytes binÃ¡rios (PDFs) com retry e limite de tamanho.
+fn baixar_bytes(url: &str, max_bytes: usize) -> Result<Vec<u8>, BoxError> {
+    baixar_bytes_com_config(url, max_bytes, Duration::from_secs(60), 3)
+}
+
+pub fn baixar_bytes_com_config(
+    url: &str,
+    max_bytes: usize,
+    timeout: Duration,
+    max_tentativas: u32,
+) -> Result<Vec<u8>, BoxError> {
+    let max_tentativas = max_tentativas.max(1);
     let cliente = reqwest::blocking::Client::builder()
         .user_agent("NEXUS-Agent/0.1")
-        .timeout(std::time::Duration::from_secs(60))
+        .timeout(timeout)
         .build()?;
 
     let mut tentativa = 0;
-    let max_tentativas = 3;
 
     loop {
         tentativa += 1;
@@ -232,29 +347,39 @@ fn baixar_bytes(url: &str, max_bytes: usize) -> Result<Vec<u8>, Box<dyn std::err
                 let status = resp.status();
 
                 if status.as_u16() == 429 {
-                    let aguardar = resp.headers()
+                    let aguardar = resp
+                        .headers()
                         .get("retry-after")
                         .and_then(|v| v.to_str().ok())
                         .and_then(|s| s.parse::<u64>().ok())
                         .unwrap_or(30);
-                    std::thread::sleep(std::time::Duration::from_secs(aguardar));
-                    if tentativa >= max_tentativas { break; }
+                    std::thread::sleep(Duration::from_secs(aguardar));
+                    if tentativa >= max_tentativas {
+                        break;
+                    }
                     continue;
                 }
 
-                if status.is_server_error() && tentativa < max_tentativas {
-                    let delay = 2u64.pow(tentativa as u32);
-                    std::thread::sleep(std::time::Duration::from_secs(delay));
-                    continue;
+                if status.is_client_error() {
+                    return Err(format!("HTTP {} ao baixar {}", status, url).into());
+                }
+
+                if status.is_server_error() {
+                    if tentativa < max_tentativas {
+                        let delay = 2u64.pow(tentativa as u32);
+                        std::thread::sleep(Duration::from_secs(delay));
+                        continue;
+                    }
+                    return Err(format!("HTTP {} ao baixar {}", status, url).into());
                 }
 
                 let bytes = resp.bytes()?;
 
                 if bytes.len() > max_bytes {
-                    return Err(format!(
-                        "PDF muito grande: {} bytes (limite {})",
-                        bytes.len(), max_bytes
-                    ).into());
+                    return Err(
+                        format!("PDF muito grande: {} bytes (limite {})", bytes.len(), max_bytes)
+                            .into(),
+                    );
                 }
 
                 return Ok(bytes.to_vec());
@@ -262,7 +387,7 @@ fn baixar_bytes(url: &str, max_bytes: usize) -> Result<Vec<u8>, Box<dyn std::err
             Err(e) => {
                 if tentativa < max_tentativas {
                     let delay = 2u64.pow(tentativa as u32);
-                    std::thread::sleep(std::time::Duration::from_secs(delay));
+                    std::thread::sleep(Duration::from_secs(delay));
                 } else {
                     return Err(e.into());
                 }
@@ -270,14 +395,14 @@ fn baixar_bytes(url: &str, max_bytes: usize) -> Result<Vec<u8>, Box<dyn std::err
         }
     }
 
-    Err(format!("Falha após {} tentativas: {}", max_tentativas, url).into())
+    Err(format!("Falha apÃ³s {} tentativas: {}", max_tentativas, url).into())
 }
 
 // =============================================================================
-// EXTRAÇÃO DE PDF
+// EXTRAÃ‡ÃƒO DE PDF
 // =============================================================================
 
-fn extrair_texto_pdf(bytes: &[u8]) -> Result<String, Box<dyn std::error::Error>> {
+pub fn extrair_texto_pdf(bytes: &[u8]) -> Result<String, BoxError> {
     // Tentativa 1: lopdf (nativo, sem processo externo)
     if let Ok(doc) = lopdf::Document::load_mem(bytes) {
         let mut texto = String::new();
@@ -315,8 +440,8 @@ fn extrair_texto_pdf(bytes: &[u8]) -> Result<String, Box<dyn std::error::Error>>
         }
         Ok(_) => {}
         Err(e) => {
-            // pdftotext não instalado — avisa uma vez
-            eprintln!("  [AVISO] pdftotext não disponível (instale poppler-utils): {}", e);
+            // pdftotext nÃ£o instalado â€” avisa uma vez
+            eprintln!("  [AVISO] pdftotext nÃ£o disponÃ­vel (instale poppler-utils): {}", e);
         }
     }
 
@@ -324,7 +449,7 @@ fn extrair_texto_pdf(bytes: &[u8]) -> Result<String, Box<dyn std::error::Error>>
 }
 
 // =============================================================================
-// EXTRAÇÃO DE LINKS
+// EXTRAÃ‡ÃƒO DE LINKS
 // =============================================================================
 
 fn extrair_links_pdf(html: &str, base_url: &str) -> Vec<String> {
@@ -403,10 +528,10 @@ fn extrair_links(html: &str, base_url: &str) -> Vec<String> {
 }
 
 // =============================================================================
-// EXTRAÇÃO DE TEXTO HTML
+// EXTRAÃ‡ÃƒO DE TEXTO HTML
 // =============================================================================
 
-fn extrair_texto_limpo(html: &str) -> String {
+pub fn extrair_texto_limpo(html: &str) -> String {
     let documento = Html::parse_document(html);
 
     let seletores_principais = [
@@ -462,7 +587,7 @@ fn extrair_texto_limpo(html: &str) -> String {
         }
     }
 
-    // Fallback genérico
+    // Fallback genÃ©rico
     let seletor_conteudo = Selector::parse(
         "p, h1, h2, h3, h4, h5, h6, pre, code, blockquote, article, td, th, dt, dd"
     ).unwrap();
@@ -502,7 +627,7 @@ fn extrair_texto_limpo(html: &str) -> String {
 }
 
 // =============================================================================
-// ANÁLISE DE QUALIDADE (limiares via Config)
+// ANÃLISE DE QUALIDADE (limiares via Config)
 // =============================================================================
 
 fn analisar_qualidade(texto: &str, config: &Config) -> (bool, &'static str) {
@@ -562,76 +687,101 @@ fn analisar_qualidade(texto: &str, config: &Config) -> (bool, &'static str) {
 // HASH E BANCO DE DADOS
 // =============================================================================
 
-fn calcular_hash(conteudo: &str) -> String {
+pub fn calcular_hash(conteudo: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(conteudo.as_bytes());
     hex::encode(hasher.finalize())
 }
 
-fn hash_armazenado(client: &mut postgres::Client, url: &str) -> Option<String> {
-    match client.query_opt(
-        "SELECT content_hash FROM documents WHERE source = $1 ORDER BY collected_at DESC LIMIT 1",
-        &[&url],
-    ) {
-        Ok(Some(row)) => Some(row.get(0)),
-        _ => None,
-    }
+fn hash_armazenado<S: IngestStore>(store: &mut S, url: &str) -> Option<String> {
+    store.get_hash_by_source(url).ok().flatten()
 }
 
-fn e_erro_duplicata(e: &Box<dyn std::error::Error>) -> bool {
+fn e_erro_duplicata(e: &BoxError) -> bool {
     let msg = format!("{:?}", e);
     msg.contains("duplicate key") || msg.contains("E23505")
 }
 
-fn atualizar_documento(
-    client: &mut postgres::Client,
+fn atualizar_documento<S: IngestStore>(
+    store: &mut S,
     url: &str,
     conteudo: &str,
     hash: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let tamanho = conteudo.len() as i32;
-    client.execute(
-        "UPDATE documents SET content = $1, content_hash = $2, content_length = $3, collected_at = NOW()
-         WHERE source = $4",
-        &[&conteudo, &hash, &tamanho, &url],
-    )?;
+) -> Result<(), BoxError> {
+    store.update_document(url, conteudo, hash)?;
     println!("  [ATUALIZADO] {} ({} bytes)", url, conteudo.len());
     Ok(())
 }
 
-fn inserir_documento(
-    client: &mut postgres::Client,
+fn inserir_documento<S: IngestStore>(
+    store: &mut S,
     url: &str,
     domain: &str,
     doc_type: &str,
     conteudo: &str,
     hash: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let id = Uuid::new_v4();
-    let tamanho = conteudo.len() as i32;
+) -> Result<Uuid, BoxError> {
+    let mut tx = store.begin_tx()?;
+    let novo = NewDocument {
+        url,
+        domain,
+        doc_type,
+        content: conteudo,
+        hash,
+    };
 
-    client.execute(
-        "INSERT INTO documents (id, content, source, domain, doc_type, content_hash, content_length, inserted_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 'agent')",
-        &[&id, &conteudo, &url, &domain, &doc_type, &hash, &tamanho],
-    )?;
+    let id = tx.insert_document(&novo)?;
+    if let Err(e) = tx.insert_validation(id) {
+        let _ = tx.rollback();
+        return Err(e);
+    }
 
-    let val_id = Uuid::new_v4();
-    client.execute(
-        "INSERT INTO validation (id, document_id, status, decided_by)
-         VALUES ($1, $2, 'pending', 'agent')",
-        &[&val_id, &id],
-    )?;
+    tx.commit()?;
+    Ok(id)
+}
 
-    Ok(())
+#[derive(Debug, PartialEq)]
+pub enum IngestOutcome {
+    Inserted(Uuid),
+    Updated,
+    IgnoredDuplicate,
+}
+
+pub fn ingest_text_document<S: IngestStore>(
+    store: &mut S,
+    url: &str,
+    domain: &str,
+    doc_type: &str,
+    conteudo: &str,
+) -> Result<IngestOutcome, BoxError> {
+    let hash = calcular_hash(conteudo);
+
+    match hash_armazenado(store, url) {
+        Some(hash_antigo) => {
+            if hash_antigo == hash {
+                Ok(IngestOutcome::IgnoredDuplicate)
+            } else {
+                match atualizar_documento(store, url, conteudo, &hash) {
+                    Ok(_) => Ok(IngestOutcome::Updated),
+                    Err(e) if e_erro_duplicata(&e) => Ok(IngestOutcome::IgnoredDuplicate),
+                    Err(e) => Err(e),
+                }
+            }
+        }
+        None => match inserir_documento(store, url, domain, doc_type, conteudo, &hash) {
+            Ok(id) => Ok(IngestOutcome::Inserted(id)),
+            Err(e) if e_erro_duplicata(&e) => Ok(IngestOutcome::IgnoredDuplicate),
+            Err(e) => Err(e),
+        },
+    }
 }
 
 // =============================================================================
-// PROCESSAMENTO DE PÁGINAS E PDFs
+// PROCESSAMENTO DE PÃGINAS E PDFs
 // =============================================================================
 
-fn processar_pdf(
-    client: &mut postgres::Client,
+fn processar_pdf<S: IngestStore>(
+    store: &mut S,
     url: &str,
     domain: &str,
     inseridos: &mut usize,
@@ -644,7 +794,7 @@ fn processar_pdf(
         return;
     }
 
-    if hash_armazenado(client, url).is_some() {
+    if hash_armazenado(store, url).is_some() {
         *ignorados += 1;
         return;
     }
@@ -652,36 +802,39 @@ fn processar_pdf(
     println!("  [PDF] Baixando {}", url);
 
     match baixar_bytes(url, config.max_bytes_pdf) {
-        Ok(bytes) => {
-            match extrair_texto_pdf(&bytes) {
-                Ok(texto) => {
-                    let texto = texto.trim().to_string();
-                    if texto.len() < 300 {
-                        println!("  [PDF FILTRADO] {} — conteudo muito curto", url);
-                        return;
-                    }
-                    let hash = calcular_hash(&texto);
-                    match inserir_documento(client, url, domain, "pdf", &texto, &hash) {
-                        Ok(_) => {
-                            *inseridos += 1;
-                            println!("  [PDF OK] ({}/{}) {} ({} bytes)", inseridos, max_paginas, url, texto.len());
-                        }
-                        Err(e) => {
-                            if e_erro_duplicata(&e) {
-                                *ignorados += 1;
-                            } else {
-                                *erros += 1;
-                                eprintln!("  [PDF ERRO DB] {}: {:?}", url, e);
-                            }
-                        }
-                    }
+        Ok(bytes) => match extrair_texto_pdf(&bytes) {
+            Ok(texto) => {
+                let texto = texto.trim().to_string();
+                if texto.len() < 300 {
+                    println!("  [PDF FILTRADO] {} â€” conteudo muito curto", url);
+                    return;
                 }
-                Err(e) => {
-                    *erros += 1;
-                    eprintln!("  [PDF ERRO EXTRACAO] {}: {}", url, e);
+
+                match ingest_text_document(store, url, domain, "pdf", &texto) {
+                    Ok(IngestOutcome::Inserted(_)) | Ok(IngestOutcome::Updated) => {
+                        *inseridos += 1;
+                        println!(
+                            "  [PDF OK] ({}/{}) {} ({} bytes)",
+                            inseridos,
+                            max_paginas,
+                            url,
+                            texto.len()
+                        );
+                    }
+                    Ok(IngestOutcome::IgnoredDuplicate) => {
+                        *ignorados += 1;
+                    }
+                    Err(e) => {
+                        *erros += 1;
+                        eprintln!("  [PDF ERRO DB] {}: {:?}", url, e);
+                    }
                 }
             }
-        }
+            Err(e) => {
+                *erros += 1;
+                eprintln!("  [PDF ERRO EXTRACAO] {}: {}", url, e);
+            }
+        },
         Err(e) => {
             *erros += 1;
             eprintln!("  [PDF ERRO HTTP] {}: {}", url, e);
@@ -689,8 +842,8 @@ fn processar_pdf(
     }
 }
 
-fn processar_pagina(
-    client: &mut postgres::Client,
+fn processar_pagina<S: IngestStore>(
+    store: &mut S,
     url: &str,
     domain: &str,
     doc_type: &str,
@@ -704,12 +857,14 @@ fn processar_pagina(
 ) {
     let pdfs = extrair_links_pdf(html, url);
     for pdf_url in pdfs {
-        if *inseridos >= max_paginas { break; }
-        processar_pdf(client, &pdf_url, domain, inseridos, ignorados, erros, max_paginas, config);
+        if *inseridos >= max_paginas {
+            break;
+        }
+        processar_pdf(store, &pdf_url, domain, inseridos, ignorados, erros, max_paginas, config);
         std::thread::sleep(std::time::Duration::from_millis(config.delay_ms));
     }
 
-    // Detecta arquivos plain text pela URL — pula extrator HTML
+    // Detecta arquivos plain text pela URL â€” pula extrator HTML
     // que colapsaria todas as quebras de linha via split_whitespace
     let extensoes_plain: &[&str] = &[".txt", ".md", ".rst", ".rst.txt", ".json"];
     let url_lower = url.to_lowercase();
@@ -723,46 +878,30 @@ fn processar_pagina(
     let (util, motivo) = analisar_qualidade(&texto, config);
     if !util {
         *filtrados += 1;
-        println!("  [FILTRADO] {} — {}", url, motivo);
+        println!("  [FILTRADO] {} â€” {}", url, motivo);
         return;
     }
 
-    let hash = calcular_hash(&texto);
-
-    match hash_armazenado(client, url) {
-        Some(hash_antigo) => {
-            if hash_antigo == hash {
-                *ignorados += 1;
-            } else {
-                match atualizar_documento(client, url, &texto, &hash) {
-                    Ok(_) => *inseridos += 1,
-                    Err(e) => {
-                        if e_erro_duplicata(&e) {
-                            *ignorados += 1;
-                        } else {
-                            *erros += 1;
-                            eprintln!("  [ERRO UPDATE] {}: {:?}", url, e);
-                        }
-                    }
-                }
-            }
+    match ingest_text_document(store, url, domain, doc_type, &texto) {
+        Ok(IngestOutcome::Inserted(_)) => {
+            *inseridos += 1;
+            println!(
+                "  [OK] ({}/{}) {} ({} bytes texto)",
+                inseridos,
+                max_paginas,
+                url,
+                texto.len()
+            );
         }
-        None => {
-            match inserir_documento(client, url, domain, doc_type, &texto, &hash) {
-                Ok(_) => {
-                    *inseridos += 1;
-                    println!("  [OK] ({}/{}) {} ({} bytes texto)",
-                        inseridos, max_paginas, url, texto.len());
-                }
-                Err(e) => {
-                    if e_erro_duplicata(&e) {
-                        *ignorados += 1;
-                    } else {
-                        *erros += 1;
-                        eprintln!("  [ERRO DB] {}: {:?}", url, e);
-                    }
-                }
-            }
+        Ok(IngestOutcome::Updated) => {
+            *inseridos += 1;
+        }
+        Ok(IngestOutcome::IgnoredDuplicate) => {
+            *ignorados += 1;
+        }
+        Err(e) => {
+            *erros += 1;
+            eprintln!("  [ERRO DB] {}: {:?}", url, e);
         }
     }
 }
@@ -771,15 +910,15 @@ fn processar_pagina(
 // CRAWLER BFS
 // =============================================================================
 
-fn coletar_crawling(
-    client: &mut postgres::Client,
+fn coletar_crawling<S: IngestStore>(
+    store: &mut S,
     fonte: &FonteConfig,
     config: &Config,
 ) {
     // max_paginas da fonte sobrescreve o global se definido
     let max_paginas = fonte.max_paginas.unwrap_or(config.max_paginas);
 
-    println!("\n[FONTE] {} ({}) — limite {} páginas", fonte.url, fonte.domain, max_paginas);
+    println!("\n[FONTE] {} ({}) â€” limite {} pÃ¡ginas", fonte.url, fonte.domain, max_paginas);
 
     let mut visitados: HashSet<String> = HashSet::new();
     let mut fila: VecDeque<(String, usize)> = VecDeque::new();
@@ -828,7 +967,7 @@ fn coletar_crawling(
                 };
 
                 processar_pagina(
-                    client, &url_atual, fonte.domain, fonte.doc_type, &html,
+                    store, &url_atual, fonte.domain, fonte.doc_type, &html,
                     &mut inseridos, &mut ignorados_duplicados, &mut filtrados, &mut erros,
                     max_paginas, config,
                 );
@@ -853,13 +992,13 @@ fn coletar_crawling(
 }
 
 // =============================================================================
-// COLETA NVD — hash apenas dos campos estáveis (corrige re-coleta infinita)
+// COLETA NVD â€” hash apenas dos campos estÃ¡veis (corrige re-coleta infinita)
 // =============================================================================
 
-/// Extrai apenas os campos estáveis de um lote de CVEs para calcular o hash.
-/// Ignora timestamps e outros campos mutáveis que mudam a cada chamada da API.
+/// Extrai apenas os campos estÃ¡veis de um lote de CVEs para calcular o hash.
+/// Ignora timestamps e outros campos mutÃ¡veis que mudam a cada chamada da API.
 fn hash_nvd_estavel(json_bruto: &str) -> String {
-    // Tenta parsear e extrair apenas campos que não variam
+    // Tenta parsear e extrair apenas campos que nÃ£o variam
     if let Ok(valor) = serde_json::from_str::<serde_json::Value>(json_bruto) {
         if let Some(vulnerabilidades) = valor["vulnerabilities"].as_array() {
             let campos_estaveis: Vec<serde_json::Value> = vulnerabilidades.iter()
@@ -883,7 +1022,7 @@ fn hash_nvd_estavel(json_bruto: &str) -> String {
     calcular_hash(json_bruto)
 }
 
-fn coletar_nvd(client: &mut postgres::Client) {
+fn coletar_nvd<S: IngestStore>(store: &mut S) {
     println!("\n[FONTE API] NVD CVE Database (security)");
 
     let http = reqwest::blocking::Client::builder()
@@ -947,20 +1086,20 @@ fn coletar_nvd(client: &mut postgres::Client) {
 
         match resultado {
             Ok(conteudo) if conteudo.len() >= 100 => {
-                // Hash apenas dos campos estáveis — resolve re-coleta infinita por timestamps
+                // Hash apenas dos campos estÃ¡veis â€” resolve re-coleta infinita por timestamps
                 let hash = hash_nvd_estavel(&conteudo);
 
-                match hash_armazenado(client, &source_url) {
+                match hash_armazenado(store, &source_url) {
                     Some(h) if h == hash => {
                         ignorados_duplicados += 1;
-                        println!("  [IGNORADO] {} — sem mudancas nos CVEs", source_url);
+                        println!("  [IGNORADO] {} â€” sem mudancas nos CVEs", source_url);
                     }
                     Some(_) => {
-                        let _ = atualizar_documento(client, &source_url, &conteudo, &hash);
+                        let _ = atualizar_documento(store, &source_url, &conteudo, &hash);
                         inseridos += 1;
                     }
                     None => {
-                        match inserir_documento(client, &source_url, "security", "cve", &conteudo, &hash) {
+                        match inserir_documento(store, &source_url, "security", "cve", &conteudo, &hash) {
                             Ok(_) => {
                                 inseridos += 1;
                                 println!("  [OK] {} ({} bytes)", source_url, conteudo.len());
@@ -1042,7 +1181,7 @@ fn main() {
     coletar_crawling(&mut client, &FonteConfig::new("https://doc.rust-lang.org/cargo/", "rust", "documentation"), &config);
 
     // -------------------------------------------------------------------------
-    // INFRA — kernel.org com limite maior por ter muito mais conteúdo
+    // INFRA â€” kernel.org com limite maior por ter muito mais conteÃºdo
     // -------------------------------------------------------------------------
     coletar_crawling(&mut client,
         &FonteConfig::new("https://www.kernel.org/doc/html/latest/", "infra", "documentation")
@@ -1065,3 +1204,17 @@ fn main() {
 
     println!("\nColeta finalizada.");
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
