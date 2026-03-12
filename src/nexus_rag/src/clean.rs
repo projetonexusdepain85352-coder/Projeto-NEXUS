@@ -72,7 +72,7 @@ fn drop_by_signature(lower: &str) -> bool {
         "menu",
     ];
 
-    if EXACT.iter().any(|x| lower == *x) {
+    if EXACT.contains(&lower) {
         return true;
     }
 

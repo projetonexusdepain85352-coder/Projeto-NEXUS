@@ -216,7 +216,7 @@ print("NEXUS_TRAINING_COMPLETE", flush=True)
 }
 
 fn sanitize_str(s: &str) -> String {
-    s.replace('\\', "/").replace('"', "_").replace('\'', "_")
+    s.replace('\\', "/").replace(['"', '\''], "_")
 }
 
 fn resolve_model_path(base_model: &str) -> String {

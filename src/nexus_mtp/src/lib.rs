@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
+extern crate self as nexus_mtp;
 pub mod approval;
 pub mod benchmark;
 pub mod clean;

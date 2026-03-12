@@ -23,10 +23,8 @@ pub fn build_qdrant_client() -> Result<Qdrant> {
 
     let mut builder = Qdrant::from_url(&url);
 
-    if let Ok(key) = std::env::var("QDRANT_API_KEY") {
-        if !key.is_empty() {
-            builder = builder.api_key(key);
-        }
+    if let Ok(key) = std::env::var("QDRANT_API_KEY") && !key.is_empty() {
+        builder = builder.api_key(key);
     }
 
     let client = builder

@@ -1,4 +1,4 @@
-﻿use sha2::{Sha256, Digest};
+use sha2::{Sha256, Digest};
 use uuid::Uuid;
 use scraper::{Html, Selector};
 use std::collections::{HashSet, VecDeque};
@@ -230,9 +230,9 @@ fn canonicalizar_url(url: &str) -> String {
 // DOWNLOAD COM RETRY
 // =============================================================================
 
-/// Resultado de download com informaÃ§Ã£o sobre limite de tamanho excedido.
-
-/// Baixa conteÃºdo HTML com retry exponencial (atÃ© 3 tentativas).
+/// Resultado de download com informacao sobre limite de tamanho excedido.
+///
+/// Baixa conteudo HTML com retry exponencial (ate 3 tentativas).
 /// Respeita Retry-After quando presente. Rejeita respostas > max_bytes.
 fn baixar_conteudo(url: &str, max_bytes: usize) -> Result<String, BoxError> {
     baixar_conteudo_com_config(url, max_bytes, Duration::from_secs(30), 3)
@@ -284,7 +284,7 @@ pub fn baixar_conteudo_com_config(
                 // Erros de servidor â€” retry com backoff
                 if status.is_server_error() {
                     if tentativa < max_tentativas {
-                        let delay = 2u64.pow(tentativa as u32);
+                        let delay = 2u64.pow(tentativa);
                         eprintln!("  [ERRO HTTP {}] {} â€” retry em {}s", status, url, delay);
                         std::thread::sleep(Duration::from_secs(delay));
                         continue;
@@ -308,7 +308,7 @@ pub fn baixar_conteudo_com_config(
             }
             Err(e) => {
                 if tentativa < max_tentativas {
-                    let delay = 2u64.pow(tentativa as u32);
+                    let delay = 2u64.pow(tentativa);
                     eprintln!("  [ERRO REDE] {} â€” retry em {}s: {}", url, delay, e);
                     std::thread::sleep(Duration::from_secs(delay));
                 } else {
@@ -366,7 +366,7 @@ pub fn baixar_bytes_com_config(
 
                 if status.is_server_error() {
                     if tentativa < max_tentativas {
-                        let delay = 2u64.pow(tentativa as u32);
+                        let delay = 2u64.pow(tentativa);
                         std::thread::sleep(Duration::from_secs(delay));
                         continue;
                     }
@@ -386,7 +386,7 @@ pub fn baixar_bytes_com_config(
             }
             Err(e) => {
                 if tentativa < max_tentativas {
-                    let delay = 2u64.pow(tentativa as u32);
+                    let delay = 2u64.pow(tentativa);
                     std::thread::sleep(Duration::from_secs(delay));
                 } else {
                     return Err(e.into());
@@ -780,6 +780,7 @@ pub fn ingest_text_document<S: IngestStore>(
 // PROCESSAMENTO DE PÃGINAS E PDFs
 // =============================================================================
 
+#[allow(clippy::too_many_arguments)] // Assinatura legada com muitos parametros.
 fn processar_pdf<S: IngestStore>(
     store: &mut S,
     url: &str,
@@ -842,6 +843,7 @@ fn processar_pdf<S: IngestStore>(
     }
 }
 
+#[allow(clippy::too_many_arguments)] // Assinatura legada com muitos parametros.
 fn processar_pagina<S: IngestStore>(
     store: &mut S,
     url: &str,
@@ -1075,7 +1077,7 @@ fn coletar_nvd<S: IngestStore>(store: &mut S) {
                 }
                 Err(e) => {
                     if tentativa < max_tentativas {
-                        let delay = 2u64.pow(tentativa as u32);
+                        let delay = 2u64.pow(tentativa);
                         std::thread::sleep(std::time::Duration::from_secs(delay));
                     } else {
                         break Err(e.to_string());
@@ -1204,6 +1206,8 @@ fn main() {
 
     println!("\nColeta finalizada.");
 }
+
+
 
 
 

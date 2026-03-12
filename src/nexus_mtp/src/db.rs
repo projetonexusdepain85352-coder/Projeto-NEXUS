@@ -131,6 +131,7 @@ pub async fn fail_training_cycle(pool: &PgPool, cycle_id: Uuid) -> Result<()> {
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)] // Assinatura legada, mantida por compatibilidade.
 pub async fn create_model(
     pool: &PgPool,
     name: &str,

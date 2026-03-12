@@ -110,60 +110,54 @@ pub async fn run_approval_tui(pool: &PgPool) -> Result<()> {
             f.render_widget(msg, chunks[2]);
         })?;
 
-        if event::poll(std::time::Duration::from_millis(200))? {
-            if let Event::Key(key) = event::read()? {
-                match key.code {
-                    KeyCode::Char('q') | KeyCode::Esc => break,
-                    KeyCode::Down => {
-                        let i = state
-                            .selected()
-                            .map(|s| (s + 1).min(models.len().saturating_sub(1)))
-                            .unwrap_or(0);
-                        state.select(Some(i));
-                    }
-                    KeyCode::Up => {
-                        let i = state.selected().map(|s| s.saturating_sub(1)).unwrap_or(0);
-                        state.select(Some(i));
-                    }
-                    KeyCode::Char('a') => {
-                        if let Some(idx) = state.selected() {
-                            if idx < models.len() {
-                                let m = &models[idx];
-                                approve_model(pool, m.id).await?;
-                                let msg = format!("OK '{}' APROVADO.", m.name);
-                                info!("{}", msg);
-                                messages.push(msg);
-                                models.remove(idx);
-                                if models.is_empty() {
-                                    state.select(None);
-                                } else {
-                                    state.select(Some(idx.min(models.len() - 1)));
-                                }
-                            }
+        if event::poll(std::time::Duration::from_millis(200))? && let Event::Key(key) = event::read()? {
+            match key.code {
+                KeyCode::Char('q') | KeyCode::Esc => break,
+                KeyCode::Down => {
+                    let i = state
+                        .selected()
+                        .map(|s| (s + 1).min(models.len().saturating_sub(1)))
+                        .unwrap_or(0);
+                    state.select(Some(i));
+                }
+                KeyCode::Up => {
+                    let i = state.selected().map(|s| s.saturating_sub(1)).unwrap_or(0);
+                    state.select(Some(i));
+                }
+                KeyCode::Char('a') => {
+                    if let Some(idx) = state.selected() && idx < models.len() {
+                        let m = &models[idx];
+                        approve_model(pool, m.id).await?;
+                        let msg = format!("OK '{}' APROVADO.", m.name);
+                        info!("{}", msg);
+                        messages.push(msg);
+                        models.remove(idx);
+                        if models.is_empty() {
+                            state.select(None);
+                        } else {
+                            state.select(Some(idx.min(models.len() - 1)));
                         }
                     }
-                    KeyCode::Char('r') => {
-                        if let Some(idx) = state.selected() {
-                            if idx < models.len() {
-                                let m = &models[idx];
-                                reject_model(pool, m.id).await?;
-                                let msg = format!("XX '{}' REJEITADO.", m.name);
-                                info!("{}", msg);
-                                messages.push(msg);
-                                models.remove(idx);
-                                if models.is_empty() {
-                                    state.select(None);
-                                } else {
-                                    state.select(Some(idx.min(models.len() - 1)));
-                                }
-                            }
+                }
+                KeyCode::Char('r') => {
+                    if let Some(idx) = state.selected() && idx < models.len() {
+                        let m = &models[idx];
+                        reject_model(pool, m.id).await?;
+                        let msg = format!("XX '{}' REJEITADO.", m.name);
+                        info!("{}", msg);
+                        messages.push(msg);
+                        models.remove(idx);
+                        if models.is_empty() {
+                            state.select(None);
+                        } else {
+                            state.select(Some(idx.min(models.len() - 1)));
                         }
                     }
-                    _ => {}
                 }
-                if models.is_empty() {
-                    messages.push("Todos processados. [q] para sair.".into());
-                }
+                _ => {}
+            }
+            if models.is_empty() {
+                messages.push("Todos processados. [q] para sair.".into());
             }
         }
     }

@@ -297,10 +297,10 @@ async fn count_distinct_docs(client: &Qdrant, collection: &str) -> Result<u64> {
         pages += 1;
 
         for point in &resp.result {
-            if let Some(v) = point.payload.get("document_id") {
-                if let Some(Kind::StringValue(s)) = v.kind.as_ref() {
-                    unique.insert(s.clone());
-                }
+            if let Some(v) = point.payload.get("document_id")
+                && let Some(Kind::StringValue(s)) = v.kind.as_ref()
+            {
+                unique.insert(s.clone());
             }
         }
 

@@ -1,20 +1,14 @@
 #![allow(dead_code)]
-mod approval;
-mod benchmark;
-mod clean;
-mod dataset;
-mod db;
-mod error;
-mod trainer;
 
-use std::{collections::HashMap, fs, os::unix::fs::symlink, path::PathBuf};
+use std::{collections::HashMap, fs, os::unix::fs::symlink, path::{Path, PathBuf}};
 
 use clap::{Parser, Subcommand};
 use sqlx::postgres::PgPoolOptions;
 use tracing::info;
 use uuid::Uuid;
+use nexus_mtp::{approval, benchmark, dataset, db, trainer};
 
-use crate::error::{MtpError, Result};
+use nexus_mtp::error::{MtpError, Result};
 
 const DEFAULT_BASE_MODEL: &str = "mistralai/Mistral-7B-Instruct-v0.3";
 const DEFAULT_MAX_SEQ_LEN: u32 = 2048;
@@ -180,7 +174,7 @@ async fn cmd_extract(pool: &sqlx::PgPool, domain: &str, max_samples: i64) -> Res
 async fn cmd_train(
     pool: &sqlx::PgPool,
     domain: &str,
-    dataset: &PathBuf,
+    dataset: &Path,
     base_model: &str,
     epochs: u32,
     lora_r: u32,
@@ -231,7 +225,7 @@ async fn cmd_train(
 
     let job = trainer::TrainJob {
         base_model: base_model.clone(),
-        dataset_path: dataset.clone(),
+        dataset_path: dataset.to_path_buf(),
         domain: domain.to_string(),
         epochs,
         lora_r,
@@ -364,8 +358,8 @@ async fn cmd_status(pool: &sqlx::PgPool) -> Result<()> {
 
     println!("=== NEXUS MTP -- Status ===\n");
     println!(
-        "{:<12} {:>14} {:>14} {:>10} {}",
-        "Dominio", "Docs Aprovados", "Usados Treino", "Modelos", "Modelo Ativo"
+        "{:<12} {:>14} {:>14} {:>10} Modelo Ativo",
+        "Dominio", "Docs Aprovados", "Usados Treino", "Modelos"
     );
     println!("{}", "-".repeat(75));
     for s in &stats {
@@ -466,14 +460,12 @@ async fn cmd_stage_a_gate(pool: &sqlx::PgPool, cfg: &StageAGateConfig) -> Result
     println!("Total pendente (todos dominios): {}", pending_total_all);
     println!("Total rejeitado (todos dominios): {}", rejected_total_all);
 
-    if let Some(max_pending) = cfg.max_pending_total {
-        if pending_total_all > max_pending {
-            gate_ok = false;
-            reasons.push(format!(
-                "pendentes totais acima do limite ({} > {})",
-                pending_total_all, max_pending
-            ));
-        }
+    if let Some(max_pending) = cfg.max_pending_total && pending_total_all > max_pending {
+        gate_ok = false;
+        reasons.push(format!(
+            "pendentes totais acima do limite ({} > {})",
+            pending_total_all, max_pending
+        ));
     }
 
     if gate_ok {
@@ -536,7 +528,7 @@ fn url_encode(s: &str) -> String {
     out
 }
 
-fn count_jsonl_lines(path: &PathBuf) -> Result<usize> {
+fn count_jsonl_lines(path: &Path) -> Result<usize> {
     use std::io::{BufRead, BufReader};
     let f = fs::File::open(path)?;
     Ok(BufReader::new(f)
@@ -547,7 +539,7 @@ fn count_jsonl_lines(path: &PathBuf) -> Result<usize> {
 
 /// Le o sidecar .ids gerado pelo subcomando extract.
 /// Contem um UUID por linha.
-fn load_doc_ids_from_sidecar(dataset: &PathBuf) -> Result<Vec<Uuid>> {
+fn load_doc_ids_from_sidecar(dataset: &Path) -> Result<Vec<Uuid>> {
     let ids_path = dataset.with_extension("ids");
     if !ids_path.exists() {
         tracing::warn!(

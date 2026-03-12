@@ -1,4 +1,4 @@
-[package]
+﻿[package]
 name = "nexus_workspace"
 version = "0.1.0"
 edition = "2021"
@@ -13,7 +13,7 @@ members = [
 resolver = "2"
 [dev-dependencies]
 agente_intermediario = { path = "src/agente_intermediario" }
-validador = { path = "src/validador" }
+validador = { package = "nexus_validador", path = "src/validador" }
 nexus_rag = { path = "src/nexus_rag" }
 nexus_mtp = { path = "src/nexus_mtp" }
 httpmock = "0.7"
@@ -24,6 +24,7 @@ qdrant-client = "1.12.1"
 serde_json = "1.0"
 tempfile = "3.12.0"
 tracing-subscriber = { version = "0.3.18", features = ["fmt"] }
+
 
 
 
