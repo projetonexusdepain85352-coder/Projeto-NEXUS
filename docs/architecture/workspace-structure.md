@@ -1,4 +1,4 @@
-﻿# Estrutura do Workspace
+# Estrutura do Workspace
 
 ## Membros Rust do workspace
 O workspace Cargo inclui apenas crates Rust com `Cargo.toml` proprio:
@@ -16,12 +16,11 @@ Alguns modulos sao Python e nao possuem `Cargo.toml`. Eles ficam fora do workspa
 
 ### `src/nexus_control_server`
 - **Motivo da exclusao**: servidor HTTP em Python + frontend estatico (sem crate Rust).
-- **Como executar**:
-  - `python src/nexus_control_server/server.py`
+- **Como executar**: `python src/nexus_control_server/server.py`
 - **Notas**: depende de configuracao OAuth e usa `services.json` para gerenciar subprocessos. Veja `src/nexus_control_server/README.md` e `docs/runbooks/nexus_control_server_README.md`.
 
 ### `src/nexus_sugestor`
 - **Motivo da exclusao**: daemon Python com socket UNIX + Ollama (sem crate Rust).
-- **Como executar**:
-  - `python3 src/nexus_sugestor/servidor.py`
+- **Como executar**: `python3 src/nexus_sugestor/servidor.py`
+- **Interface com validador**: socket UNIX (padrao `/tmp/nexus_sugestor.sock` via `NEXUS_SUGESTOR_SOCKET`). Entrada JSON linha unica com `domain` e `content`; resposta JSON com `util`, `confianca` e `motivo`.
 - **Notas**: requer Ollama rodando localmente e um modelo compativel. Veja `src/nexus_sugestor/README.md`.
