@@ -5,6 +5,7 @@ use std::{
 };
 
 use chrono::Utc;
+use async_trait::async_trait;
 use serde::Serialize;
 use sqlx::PgPool;
 use tracing::{info, warn};
@@ -12,7 +13,7 @@ use uuid::Uuid;
 
 use crate::clean::clean_document_text;
 use crate::{
-    db::{fetch_approved_documents, mark_training_eligible},
+    db::{fetch_approved_documents, mark_training_eligible, ApprovedDocument},
     error::{MtpError, Result},
 };
 
@@ -27,15 +28,49 @@ pub struct AlpacaExample {
     pub source: String,
 }
 
+#[async_trait]
+pub trait DatasetStore {
+    async fn fetch_approved_documents(
+        &self,
+        domain: &str,
+        max_samples: i64,
+    ) -> Result<Vec<ApprovedDocument>>;
+    async fn mark_training_eligible(&self, ids: &[Uuid]) -> Result<u64>;
+}
+
+#[async_trait]
+impl DatasetStore for PgPool {
+    async fn fetch_approved_documents(
+        &self,
+        domain: &str,
+        max_samples: i64,
+    ) -> Result<Vec<ApprovedDocument>> {
+        fetch_approved_documents(self, domain, max_samples).await
+    }
+
+    async fn mark_training_eligible(&self, ids: &[Uuid]) -> Result<u64> {
+        mark_training_eligible(self, ids).await
+    }
+}
+
 pub async fn extract(
     pool: &PgPool,
     domain: &str,
     max_samples: i64,
     datasets_dir: &str,
 ) -> Result<(PathBuf, Vec<Uuid>, usize)> {
+    extract_with_store(pool, domain, max_samples, datasets_dir).await
+}
+
+pub async fn extract_with_store<S: DatasetStore + Sync>(
+    store: &S,
+    domain: &str,
+    max_samples: i64,
+    datasets_dir: &str,
+) -> Result<(PathBuf, Vec<Uuid>, usize)> {
     validate_domain(domain)?;
     info!("Buscando documentos aprovados para domínio '{}'...", domain);
-    let docs = fetch_approved_documents(pool, domain, max_samples).await?;
+    let docs = store.fetch_approved_documents(domain, max_samples).await?;
     if docs.is_empty() {
         return Err(MtpError::NoDocuments(domain.to_string()));
     }
@@ -77,7 +112,7 @@ pub async fn extract(
     }
     bw.flush()?;
 
-    mark_training_eligible(pool, &doc_ids).await?;
+    store.mark_training_eligible(&doc_ids).await?;
 
     // Sidecar .ids com os UUIDs dos documentos incluidos
     let ids_path = PathBuf::from(datasets_dir).join(format!("{}_{}.ids", domain, ts));
@@ -97,7 +132,6 @@ pub async fn extract(
     info!("IDs salvos em: {}", ids_path.display());
     Ok((path, doc_ids, total_examples))
 }
-
 pub fn chunk_text(text: &str, chunk_words: usize, overlap_words: usize) -> Vec<String> {
     let words: Vec<&str> = text.split_whitespace().collect();
     if words.is_empty() {
@@ -151,3 +185,5 @@ mod tests {
         assert_eq!(chunks.len(), 1);
     }
 }
+
+

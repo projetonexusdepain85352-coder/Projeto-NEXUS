@@ -311,12 +311,21 @@ async fn cmd_benchmark(pool: &sqlx::PgPool, model_id: Uuid) -> Result<()> {
     Ok(())
 }
 
+
+pub fn ensure_model_deployable(model: &db::ModelRow, min_score: f32) -> Result<()> {
+    if model.status != "approved" {
+        return Err(MtpError::NotApproved(model.status.clone()));
+    }
+    let score = model.benchmark_score.ok_or(MtpError::BenchmarkMissing)?;
+    if !benchmark::benchmark_passed(score, min_score) {
+        return Err(MtpError::BenchmarkBelowThreshold { score, min_score });
+    }
+    Ok(())
+}
 async fn cmd_deploy(pool: &sqlx::PgPool, model_id: Uuid) -> Result<()> {
     let model = db::get_model(pool, model_id).await?;
-    if model.status != "approved" {
-        return Err(MtpError::NotApproved(model.status));
-    }
-
+    let min_score = benchmark::benchmark_min_score();
+    ensure_model_deployable(&model, min_score)?;
     let models_dir = resolve_models_dir();
     let adapter_full = models_dir.join(model.adapter_path.as_deref().unwrap_or(""));
     if !adapter_full.exists() {
@@ -557,3 +566,4 @@ fn load_doc_ids_from_sidecar(dataset: &PathBuf) -> Result<Vec<Uuid>> {
     tracing::info!("{} IDs carregados do sidecar.", ids.len());
     Ok(ids)
 }
+

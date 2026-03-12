@@ -18,6 +18,10 @@ pub enum MtpError {
     TrainingFailed { code: i32, stderr: String },
     #[error("Modelo precisa ter status 'approved' para deploy. Status atual: '{0}'")]
     NotApproved(String),
+    #[error("Benchmark ainda nao executado para o modelo.")]
+    BenchmarkMissing,
+    #[error("Benchmark abaixo do minimo ({score:.3} < {min_score:.3}).")]
+    BenchmarkBelowThreshold { score: f32, min_score: f32 },
     #[error("Adapter nao encontrado em: {0}")]
     AdapterNotFound(String),
     #[error("Erro de variavel de ambiente: {0}")]
@@ -37,3 +41,5 @@ impl From<anyhow::Error> for MtpError {
 }
 
 pub type Result<T> = std::result::Result<T, MtpError>;
+
+

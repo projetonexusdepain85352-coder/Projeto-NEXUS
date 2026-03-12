@@ -1,4 +1,5 @@
 use sqlx::PgPool;
+use std::env;
 use tracing::{info, warn};
 use uuid::Uuid;
 
@@ -10,6 +11,24 @@ struct BenchmarkQuestion {
     expected_keywords: Vec<String>,
 }
 
+pub const DEFAULT_BENCHMARK_MIN_SCORE: f32 = 0.7;
+
+pub fn benchmark_min_score() -> f32 {
+    match env::var("NEXUS_BENCHMARK_MIN_SCORE") {
+        Ok(raw) => match raw.trim().parse::<f32>() {
+            Ok(val) if (0.0..=1.0).contains(&val) => val,
+            _ => {
+                warn!("Valor invalido para NEXUS_BENCHMARK_MIN_SCORE; usando padrao");
+                DEFAULT_BENCHMARK_MIN_SCORE
+            }
+        },
+        Err(_) => DEFAULT_BENCHMARK_MIN_SCORE,
+    }
+}
+
+pub fn benchmark_passed(score: f32, min_score: f32) -> bool {
+    score >= min_score
+}
 pub async fn run_benchmark(
     pool: &PgPool,
     model_id: Uuid,
@@ -244,3 +263,4 @@ print(f"NEXUS_BENCHMARK_SCORE={{score}}", flush=True)
         adapter_path = adapter_path,
     )
 }
+

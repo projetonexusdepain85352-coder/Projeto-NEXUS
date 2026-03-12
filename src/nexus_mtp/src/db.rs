@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::error::Result;
 
-#[derive(Debug, sqlx::FromRow)]
+#[derive(Debug, sqlx::FromRow, Clone)]
 #[allow(dead_code)]
 pub struct ApprovedDocument {
     pub id: Uuid,
@@ -273,3 +273,5 @@ pub async fn active_model_per_domain(pool: &PgPool) -> Result<Vec<(String, Optio
             .await?,
     )
 }
+
+

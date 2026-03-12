@@ -32,6 +32,15 @@ pub struct TrainResult {
     pub adapter_checksum: String,
 }
 
+pub fn training_env_overrides() -> Vec<(&'static str, &'static str)> {
+    vec![
+        ("TORCHINDUCTOR_DISABLE", "1"),
+        ("TORCH_COMPILE_DISABLE", "1"),
+        ("UNSLOTH_ENABLE_CCE", "0"),
+        ("UNSLOTH_COMPILE_DISABLE", "1"),
+        ("UNSLOTH_CE_LOSS_N_CHUNKS", "4096"),
+    ]
+}
 pub fn run_training(job: &TrainJob) -> Result<TrainResult> {
     fs::create_dir_all(&job.output_dir)?;
     fs::create_dir_all(&job.adapter_path)?;
@@ -43,15 +52,16 @@ pub fn run_training(job: &TrainJob) -> Result<TrainResult> {
     info!("Script gerado: {}", script_path.display());
     info!("Iniciando treinamento via python3...");
 
-    let mut child = Command::new("python3")
-        .arg(&script_path)
-        .env("TORCHINDUCTOR_DISABLE", "1")
-        .env("TORCH_COMPILE_DISABLE", "1")
-        .env("UNSLOTH_ENABLE_CCE", "0")
-        .env("UNSLOTH_COMPILE_DISABLE", "1")
-        .env("UNSLOTH_CE_LOSS_N_CHUNKS", "4096")
+    let mut cmd = Command::new("python3");
+    cmd.arg(&script_path)
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    for (key, value) in training_env_overrides() {
+        cmd.env(key, value);
+    }
+
+    let mut child = cmd
         .spawn()
         .map_err(|e| MtpError::Other(format!("Falha ao iniciar python3: {e}")))?;
 
@@ -268,6 +278,7 @@ fn parse_log_line(line: &str) -> Option<LogEntry> {
         loss: v.get("loss").and_then(|l| l.as_f64()).map(|l| l as f32),
     })
 }
+
 
 
 
