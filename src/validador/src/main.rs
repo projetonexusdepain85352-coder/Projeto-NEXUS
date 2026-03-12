@@ -1,4 +1,6 @@
-﻿#![allow(clippy::invisible_characters)] // Strings legadas da TUI usam box-drawing e acentos.
+// SPDX-License-Identifier: Apache-2.0
+
+#![allow(clippy::invisible_characters)] // Strings legadas da TUI usam box-drawing e acentos.
 
 use chrono::Local;
 use postgres::{Client, NoTls};

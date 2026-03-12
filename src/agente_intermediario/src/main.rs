@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 use sha2::{Sha256, Digest};
 use uuid::Uuid;
 use scraper::{Html, Selector};
