@@ -9,7 +9,7 @@ use prometheus_client::metrics::counter::Counter;
 use prometheus_client::metrics::family::Family;
 use prometheus_client::registry::Registry;
 
-#[derive(Clone, Hash, PartialEq, Eq, EncodeLabelSet)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, EncodeLabelSet)]
 struct QueryLabels {
     result: &'static str,
 }
@@ -109,3 +109,4 @@ fn handle_connection(mut stream: TcpStream) {
     );
     let _ = stream.write_all(resp.as_bytes());
 }
+
