@@ -23,9 +23,15 @@ thiserror         = "1.0.64"
 anyhow            = "1.0.89"
 tracing           = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter", "fmt", "ansi", "json"] }
+async-trait      = "0.1.80"
+
+[features]
+default = []
+test-mocks = []
 
 [profile.release]
 opt-level       = 3
 lto             = true
 codegen-units   = 1
 strip           = true
+

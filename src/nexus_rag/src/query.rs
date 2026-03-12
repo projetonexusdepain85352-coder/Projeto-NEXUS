@@ -1,6 +1,8 @@
 //! Query pipeline: embed query -> kNN search in Qdrant -> grounded evidence only.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
+
+use async_trait::async_trait;
 
 use qdrant_client::Qdrant;
 use qdrant_client::qdrant::{ScoredPoint, SearchPointsBuilder, Value, value::Kind};
@@ -23,6 +25,83 @@ pub struct QueryResult {
     pub chunk_total: i64,
     pub chunk_text: String,
     pub collection: String,
+}
+
+pub trait EmbeddingProvider {
+    fn embed_one(&self, text: &str) -> Result<Vec<f32>>;
+}
+
+impl EmbeddingProvider for Embedder {
+    fn embed_one(&self, text: &str) -> Result<Vec<f32>> {
+        Embedder::embed_one(self, text)
+    }
+}
+
+#[async_trait]
+pub trait QdrantSearch {
+    async fn list_collections(&self) -> Result<Vec<String>>;
+    async fn collection_exists(&self, collection: &str) -> Result<bool>;
+    async fn search_points(
+        &self,
+        collection: &str,
+        vector: Vec<f32>,
+        top: usize,
+    ) -> Result<Vec<ScoredPoint>>;
+}
+
+#[async_trait]
+impl QdrantSearch for Qdrant {
+    async fn list_collections(&self) -> Result<Vec<String>> {
+        let r = Qdrant::list_collections(self).await.map_err(qdrant_err)?;
+        Ok(r.collections.into_iter().map(|c| c.name).collect())
+    }
+
+    async fn collection_exists(&self, collection: &str) -> Result<bool> {
+        Qdrant::collection_exists(self, collection).await.map_err(qdrant_err)
+    }
+
+    async fn search_points(
+        &self,
+        collection: &str,
+        vector: Vec<f32>,
+        top: usize,
+    ) -> Result<Vec<ScoredPoint>> {
+        let r = Qdrant::search_points(
+            self,
+            SearchPointsBuilder::new(collection, vector, top as u64).with_payload(true),
+        )
+        .await
+        .map_err(qdrant_err)?;
+        Ok(r.result)
+    }
+}
+
+#[cfg(feature = "test-mocks")]
+pub struct MockQdrantClient {
+    pub collections: Vec<String>,
+    pub exists: bool,
+    pub results: Vec<ScoredPoint>,
+}
+
+#[cfg(feature = "test-mocks")]
+#[async_trait]
+impl QdrantSearch for MockQdrantClient {
+    async fn list_collections(&self) -> Result<Vec<String>> {
+        Ok(self.collections.clone())
+    }
+
+    async fn collection_exists(&self, _collection: &str) -> Result<bool> {
+        Ok(self.exists)
+    }
+
+    async fn search_points(
+        &self,
+        _collection: &str,
+        _vector: Vec<f32>,
+        _top: usize,
+    ) -> Result<Vec<ScoredPoint>> {
+        Ok(self.results.clone())
+    }
 }
 
 fn get_str(p: &HashMap<String, Value>, k: &str) -> String {
@@ -66,51 +145,45 @@ fn to_result(point: ScoredPoint, collection: &str) -> QueryResult {
     }
 }
 
-async fn list_nexus_collections(client: &Qdrant) -> Result<Vec<String>> {
-    let r = client.list_collections().await.map_err(qdrant_err)?;
-    Ok(r.collections
+async fn list_nexus_collections<C: QdrantSearch + Sync>(client: &C) -> Result<Vec<String>> {
+    let all = client.list_collections().await?;
+    Ok(all
         .into_iter()
-        .map(|c| c.name)
         .filter(|n| n.starts_with("nexus_"))
         .collect())
 }
-
-async fn search_one(
-    client: &Qdrant,
+async fn search_one<C: QdrantSearch + Sync>(
+    client: &C,
     collection: &str,
     vector: Vec<f32>,
     top: usize,
 ) -> Result<Vec<ScoredPoint>> {
-    if !client
-        .collection_exists(collection)
-        .await
-        .map_err(qdrant_err)?
-    {
+    if !client.collection_exists(collection).await? {
         tracing::debug!(collection = collection, "Collection not found, skipping");
         return Ok(Vec::new());
     }
 
-    let r = client
-        .search_points(SearchPointsBuilder::new(collection, vector, top as u64).with_payload(true))
-        .await
-        .map_err(qdrant_err)?;
-    Ok(r.result)
+    client.search_points(collection, vector, top).await
 }
 
-pub async fn run_query(query_text: &str, domain: Option<&str>, top: usize) -> Result<()> {
+pub async fn run_query_with<C: QdrantSearch + Sync, E: EmbeddingProvider>(
+    client: &C,
+    embedder: &E,
+    query_text: &str,
+    domain: Option<&str>,
+    top: usize,
+) -> Result<Vec<QueryResult>> {
     let top = top.max(1);
 
     if query_text.trim().is_empty() {
         println!("Query text is empty.");
-        return Ok(());
+        return Ok(Vec::new());
     }
     if query_text.chars().count() > MAX_QUERY_CHARS {
         println!("Query exceeds maximum of {} characters.", MAX_QUERY_CHARS);
-        return Ok(());
+        return Ok(Vec::new());
     }
 
-    let client = crate::qdrant_builder::build_qdrant_client()?;
-    let embedder = Embedder::new()?;
     let query_vector = embedder.embed_one(query_text)?;
 
     tracing::debug!(dim = query_vector.len(), "Query vector generated");
@@ -118,10 +191,10 @@ pub async fn run_query(query_text: &str, domain: Option<&str>, top: usize) -> Re
     let collections: Vec<String> = match domain {
         Some(d) => vec![collection_name(d)],
         None => {
-            let all = list_nexus_collections(&client).await?;
+            let all = list_nexus_collections(client).await?;
             if all.is_empty() {
                 println!("No nexus_* collections found. Run `nexus_rag index` first.");
-                return Ok(());
+                return Ok(Vec::new());
             }
             all
         }
@@ -131,7 +204,7 @@ pub async fn run_query(query_text: &str, domain: Option<&str>, top: usize) -> Re
 
     let mut raw_results: Vec<QueryResult> = Vec::new();
     for coll in &collections {
-        let pts = search_one(&client, coll, query_vector.clone(), top).await?;
+        let pts = search_one(client, coll, query_vector.clone(), top).await?;
         raw_results.extend(pts.into_iter().map(|p| to_result(p, coll)));
     }
 
@@ -166,13 +239,8 @@ pub async fn run_query(query_text: &str, domain: Option<&str>, top: usize) -> Re
 
     results.truncate(top);
 
-    let unique_docs: HashSet<&str> = results
-        .iter()
-        .map(|r| r.document_id.as_str())
-        .filter(|id| !id.is_empty())
-        .collect();
-
-    if unique_docs.is_empty() {
+    if results.iter().any(|r| r.document_id.trim().is_empty()) {
+        tracing::warn!("Qdrant result missing document_id metadata");
         println!("GROUNDING_DENIED: evidence without document_id metadata.");
         return Err(NexusError::Ungrounded(
             "Evidence missing document_id metadata".to_string(),
@@ -211,6 +279,13 @@ pub async fn run_query(query_text: &str, domain: Option<&str>, top: usize) -> Re
     }
 
     println!();
+    Ok(results)
+}
+
+pub async fn run_query(query_text: &str, domain: Option<&str>, top: usize) -> Result<()> {
+    let client = crate::qdrant_builder::build_qdrant_client()?;
+    let embedder = Embedder::new()?;
+    let _ = run_query_with(&client, &embedder, query_text, domain, top).await?;
     Ok(())
 }
 
@@ -250,3 +325,17 @@ fn word_wrap(text: &str, width: usize) -> Vec<String> {
 
     lines
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
