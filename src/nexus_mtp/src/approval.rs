@@ -110,7 +110,9 @@ pub async fn run_approval_tui(pool: &PgPool) -> Result<()> {
             f.render_widget(msg, chunks[2]);
         })?;
 
-        if event::poll(std::time::Duration::from_millis(200))? && let Event::Key(key) = event::read()? {
+        if event::poll(std::time::Duration::from_millis(200))?
+            && let Event::Key(key) = event::read()?
+        {
             match key.code {
                 KeyCode::Char('q') | KeyCode::Esc => break,
                 KeyCode::Down => {
@@ -125,7 +127,9 @@ pub async fn run_approval_tui(pool: &PgPool) -> Result<()> {
                     state.select(Some(i));
                 }
                 KeyCode::Char('a') => {
-                    if let Some(idx) = state.selected() && idx < models.len() {
+                    if let Some(idx) = state.selected()
+                        && idx < models.len()
+                    {
                         let m = &models[idx];
                         approve_model(pool, m.id).await?;
                         let msg = format!("OK '{}' APROVADO.", m.name);
@@ -140,7 +144,9 @@ pub async fn run_approval_tui(pool: &PgPool) -> Result<()> {
                     }
                 }
                 KeyCode::Char('r') => {
-                    if let Some(idx) = state.selected() && idx < models.len() {
+                    if let Some(idx) = state.selected()
+                        && idx < models.len()
+                    {
                         let m = &models[idx];
                         reject_model(pool, m.id).await?;
                         let msg = format!("XX '{}' REJEITADO.", m.name);

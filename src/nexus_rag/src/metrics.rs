@@ -1,10 +1,10 @@
-﻿use std::io::{Read, Write};
+use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::OnceLock;
 use std::thread;
 
-use prometheus_client::encoding::text::encode;
 use prometheus_client::encoding::EncodeLabelSet;
+use prometheus_client::encoding::text::encode;
 use prometheus_client::metrics::counter::Counter;
 use prometheus_client::metrics::family::Family;
 use prometheus_client::registry::Registry;
@@ -39,14 +39,11 @@ fn metrics() -> &'static Metrics {
 
 pub fn inc_query(result: &'static str) {
     let m = metrics();
-    m.queries_total
-        .get_or_create(&QueryLabels { result })
-        .inc();
+    m.queries_total.get_or_create(&QueryLabels { result }).inc();
 }
 
 pub fn spawn_metrics_server() {
-    let addr = std::env::var("NEXUS_METRICS_ADDR")
-        .unwrap_or_else(|_| "127.0.0.1:9898".to_string());
+    let addr = std::env::var("NEXUS_METRICS_ADDR").unwrap_or_else(|_| "127.0.0.1:9898".to_string());
     let listener = match TcpListener::bind(&addr) {
         Ok(l) => l,
         Err(e) => {

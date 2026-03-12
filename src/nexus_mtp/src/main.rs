@@ -2,13 +2,18 @@
 
 #![allow(dead_code)]
 
-use std::{collections::HashMap, fs, os::unix::fs::symlink, path::{Path, PathBuf}};
+use std::{
+    collections::HashMap,
+    fs,
+    os::unix::fs::symlink,
+    path::{Path, PathBuf},
+};
 
 use clap::{Parser, Subcommand};
+use nexus_mtp::{approval, benchmark, dataset, db, trainer};
 use sqlx::postgres::PgPoolOptions;
 use tracing::info;
 use uuid::Uuid;
-use nexus_mtp::{approval, benchmark, dataset, db, trainer};
 
 use nexus_mtp::error::{MtpError, Result};
 
@@ -106,7 +111,10 @@ fn init_logging() {
         .trim()
         .eq_ignore_ascii_case("production");
     if is_production {
-        tracing_subscriber::fmt().with_env_filter(filter).json().init();
+        tracing_subscriber::fmt()
+            .with_env_filter(filter)
+            .json()
+            .init();
     } else {
         tracing_subscriber::fmt().with_env_filter(filter).init();
     }
@@ -316,7 +324,6 @@ async fn cmd_benchmark(pool: &sqlx::PgPool, model_id: Uuid) -> Result<()> {
     Ok(())
 }
 
-
 pub fn ensure_model_deployable(model: &db::ModelRow, min_score: f32) -> Result<()> {
     if model.status != "approved" {
         return Err(MtpError::NotApproved(model.status.clone()));
@@ -471,7 +478,9 @@ async fn cmd_stage_a_gate(pool: &sqlx::PgPool, cfg: &StageAGateConfig) -> Result
     println!("Total pendente (todos dominios): {}", pending_total_all);
     println!("Total rejeitado (todos dominios): {}", rejected_total_all);
 
-    if let Some(max_pending) = cfg.max_pending_total && pending_total_all > max_pending {
+    if let Some(max_pending) = cfg.max_pending_total
+        && pending_total_all > max_pending
+    {
         gate_ok = false;
         reasons.push(format!(
             "pendentes totais acima do limite ({} > {})",
@@ -569,4 +578,3 @@ fn load_doc_ids_from_sidecar(dataset: &Path) -> Result<Vec<Uuid>> {
     tracing::info!("{} IDs carregados do sidecar.", ids.len());
     Ok(ids)
 }
-

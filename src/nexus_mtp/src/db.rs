@@ -274,5 +274,3 @@ pub async fn active_model_per_domain(pool: &PgPool) -> Result<Vec<(String, Optio
             .await?,
     )
 }
-
-

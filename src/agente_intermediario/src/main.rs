@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use sha2::{Sha256, Digest};
-use uuid::Uuid;
 use scraper::{Html, Selector};
+use sha2::{Digest, Sha256};
 use std::collections::{HashSet, VecDeque};
 use std::time::Duration;
+use uuid::Uuid;
 
 pub type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
@@ -116,8 +116,8 @@ impl Default for Config {
             qualidade_max_duplicadas_pct: 0.55,
             qualidade_max_curtas_pct: 0.80,
             qualidade_min_pontuacao_pct: 0.005,
-            max_bytes_html: 10 * 1024 * 1024,  // 10 MB
-            max_bytes_pdf: 50 * 1024 * 1024,   // 50 MB
+            max_bytes_html: 10 * 1024 * 1024, // 10 MB
+            max_bytes_pdf: 50 * 1024 * 1024,  // 50 MB
         }
     }
 }
@@ -127,12 +127,17 @@ struct FonteConfig<'a> {
     url: &'a str,
     domain: &'a str,
     doc_type: &'a str,
-    max_paginas: Option<usize>,  // Override do global se definido
+    max_paginas: Option<usize>, // Override do global se definido
 }
 
 impl<'a> FonteConfig<'a> {
     fn new(url: &'a str, domain: &'a str, doc_type: &'a str) -> Self {
-        FonteConfig { url, domain, doc_type, max_paginas: None }
+        FonteConfig {
+            url,
+            domain,
+            doc_type,
+            max_paginas: None,
+        }
     }
 
     fn com_limite(mut self, max: usize) -> Self {
@@ -146,23 +151,23 @@ impl<'a> FonteConfig<'a> {
 // =============================================================================
 
 const EXTENSOES_BINARIAS: &[&str] = &[
-    ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".ico",
-    ".woff", ".woff2", ".ttf", ".eot", ".otf",
-    ".zip", ".tar", ".gz", ".bz2", ".xz",
-    ".doc", ".docx", ".xls", ".xlsx",
-    ".mp4", ".mp3", ".avi", ".mov", ".webm",
-    ".exe", ".dll", ".so", ".dylib",
-    ".css", ".map",
+    ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".ico", ".woff", ".woff2", ".ttf", ".eot",
+    ".otf", ".zip", ".tar", ".gz", ".bz2", ".xz", ".doc", ".docx", ".xls", ".xlsx", ".mp4", ".mp3",
+    ".avi", ".mov", ".webm", ".exe", ".dll", ".so", ".dylib", ".css", ".map",
 ];
 
 const PADROES_VERSAO: &[&str] = &[
-    "/v0.", "/v1.", "/v2.", "/v3.", "/v4.", "/v5.",
-    "/v6.", "/v7.", "/v8.", "/v9.",
+    "/v0.", "/v1.", "/v2.", "/v3.", "/v4.", "/v5.", "/v6.", "/v7.", "/v8.", "/v9.",
 ];
 
 const PADROES_INDICE_URL: &[&str] = &[
-    "/index.html", "/index.htm", "/toc.html", "/toc.htm",
-    "/contents.html", "/genindex", "/modindex",
+    "/index.html",
+    "/index.htm",
+    "/toc.html",
+    "/toc.htm",
+    "/contents.html",
+    "/genindex",
+    "/modindex",
 ];
 
 const ASSINATURAS_LIXO: &[&str] = &[
@@ -205,9 +210,17 @@ fn canonicalizar_url(url: &str) -> String {
     // Faz parse para manipular query string
     if let Ok(mut parsed) = url::Url::parse(sem_fragmento) {
         // Remove parÃ¢metros de rastreamento
-        let params_filtrar = ["utm_source", "utm_medium", "utm_campaign",
-                              "utm_term", "utm_content", "ref", "source"];
-        let query_limpa: Vec<(String, String)> = parsed.query_pairs()
+        let params_filtrar = [
+            "utm_source",
+            "utm_medium",
+            "utm_campaign",
+            "utm_term",
+            "utm_content",
+            "ref",
+            "source",
+        ];
+        let query_limpa: Vec<(String, String)> = parsed
+            .query_pairs()
             .filter(|(k, _)| !params_filtrar.contains(&k.as_ref()))
             .map(|(k, v)| (k.into_owned(), v.into_owned()))
             .collect();
@@ -215,7 +228,8 @@ fn canonicalizar_url(url: &str) -> String {
         if query_limpa.is_empty() {
             parsed.set_query(None);
         } else {
-            let nova_query = query_limpa.iter()
+            let nova_query = query_limpa
+                .iter()
                 .map(|(k, v)| format!("{}={}", k, v))
                 .collect::<Vec<_>>()
                 .join("&");
@@ -297,13 +311,12 @@ pub fn baixar_conteudo_com_config(
                 let conteudo = resp.text()?;
 
                 if conteudo.len() > max_bytes {
-                    return Err(
-                        format!(
-                            "Payload muito grande: {} bytes (limite {})",
-                            conteudo.len(), max_bytes
-                        )
-                        .into(),
-                    );
+                    return Err(format!(
+                        "Payload muito grande: {} bytes (limite {})",
+                        conteudo.len(),
+                        max_bytes
+                    )
+                    .into());
                 }
 
                 return Ok(conteudo);
@@ -378,10 +391,12 @@ pub fn baixar_bytes_com_config(
                 let bytes = resp.bytes()?;
 
                 if bytes.len() > max_bytes {
-                    return Err(
-                        format!("PDF muito grande: {} bytes (limite {})", bytes.len(), max_bytes)
-                            .into(),
-                    );
+                    return Err(format!(
+                        "PDF muito grande: {} bytes (limite {})",
+                        bytes.len(),
+                        max_bytes
+                    )
+                    .into());
                 }
 
                 return Ok(bytes.to_vec());
@@ -443,7 +458,10 @@ pub fn extrair_texto_pdf(bytes: &[u8]) -> Result<String, BoxError> {
         Ok(_) => {}
         Err(e) => {
             // pdftotext nÃ£o instalado â€” avisa uma vez
-            eprintln!("  [AVISO] pdftotext nÃ£o disponÃ­vel (instale poppler-utils): {}", e);
+            eprintln!(
+                "  [AVISO] pdftotext nÃ£o disponÃ­vel (instale poppler-utils): {}",
+                e
+            );
         }
     }
 
@@ -474,11 +492,30 @@ fn extrair_links_pdf(html: &str, base_url: &str) -> Vec<String> {
                         continue;
                     }
                     let url_lower = url_str.to_lowercase();
-                    let idiomas = ["arabic", "chinese", "korean", "japanese",
-                                   "hebrew", "french", "spanish", "italian",
-                                   "ukrainian", "vietnamese", "indonesian",
-                                   "portuguese", "czech", "_ar", "_cn", "_jp",
-                                   "_ko", "_fr", "_es", "_it", "_pt", "_de"];
+                    let idiomas = [
+                        "arabic",
+                        "chinese",
+                        "korean",
+                        "japanese",
+                        "hebrew",
+                        "french",
+                        "spanish",
+                        "italian",
+                        "ukrainian",
+                        "vietnamese",
+                        "indonesian",
+                        "portuguese",
+                        "czech",
+                        "_ar",
+                        "_cn",
+                        "_jp",
+                        "_ko",
+                        "_fr",
+                        "_es",
+                        "_it",
+                        "_pt",
+                        "_de",
+                    ];
                     if idiomas.iter().any(|i| url_lower.contains(i)) {
                         continue;
                     }
@@ -500,8 +537,7 @@ fn extrair_links(html: &str, base_url: &str) -> Vec<String> {
     };
     let mut links = Vec::new();
     let partes_ignorar = [
-        "/de/", "/fr/", "/es/", "/pt/", "/zh/", "/ja/",
-        "/ko/", "/ru/", "/it/", "/pl/", "/nl/",
+        "/de/", "/fr/", "/es/", "/pt/", "/zh/", "/ja/", "/ko/", "/ru/", "/it/", "/pl/", "/nl/",
     ];
 
     for elemento in documento.select(&seletor) {
@@ -515,8 +551,12 @@ fn extrair_links(html: &str, base_url: &str) -> Vec<String> {
                     let ignorar_indice = url_parece_indice(&url_str);
                     let ignorar_pdf = url_e_pdf(&url_str);
 
-                    if !ignorar_idioma && !ignorar_versao && !ignorar_binario
-                        && !ignorar_indice && !ignorar_pdf {
+                    if !ignorar_idioma
+                        && !ignorar_versao
+                        && !ignorar_binario
+                        && !ignorar_indice
+                        && !ignorar_pdf
+                    {
                         let canonical = canonicalizar_url(&url_str);
                         if !canonical.is_empty() {
                             links.push(canonical);
@@ -537,9 +577,19 @@ pub fn extrair_texto_limpo(html: &str) -> String {
     let documento = Html::parse_document(html);
 
     let seletores_principais = [
-        "main article", "main", "article", "[role='main']",
-        ".content", "#content", ".document", "#document", ".body",
-        ".post-content", ".article-body", ".markdown-body", ".rst-content",
+        "main article",
+        "main",
+        "article",
+        "[role='main']",
+        ".content",
+        "#content",
+        ".document",
+        "#document",
+        ".body",
+        ".post-content",
+        ".article-body",
+        ".markdown-body",
+        ".rst-content",
         ".devsite-article-body",
     ];
 
@@ -549,8 +599,9 @@ pub fn extrair_texto_limpo(html: &str) -> String {
          .breadcrumb, .breadcrumbs, .menu, .navbar, \
          #sidebar, #navigation, #toc, #nav, \
          [role='navigation'], [role='banner'], [role='contentinfo'], \
-         script, style, noscript"
-    ).unwrap();
+         script, style, noscript",
+    )
+    .unwrap();
 
     for seletor_str in &seletores_principais {
         if let Ok(seletor) = Selector::parse(seletor_str) {
@@ -559,8 +610,9 @@ pub fn extrair_texto_limpo(html: &str) -> String {
                 let doc_interno = Html::parse_fragment(&html_principal);
 
                 let seletor_conteudo = Selector::parse(
-                    "p, h1, h2, h3, h4, h5, h6, li, td, th, pre, code, blockquote, dt, dd"
-                ).unwrap();
+                    "p, h1, h2, h3, h4, h5, h6, li, td, th, pre, code, blockquote, dt, dd",
+                )
+                .unwrap();
 
                 let mut texto = String::new();
                 let mut nos_nav: HashSet<String> = HashSet::new();
@@ -591,18 +643,17 @@ pub fn extrair_texto_limpo(html: &str) -> String {
 
     // Fallback genÃ©rico
     let seletor_conteudo = Selector::parse(
-        "p, h1, h2, h3, h4, h5, h6, pre, code, blockquote, article, td, th, dt, dd"
-    ).unwrap();
+        "p, h1, h2, h3, h4, h5, h6, pre, code, blockquote, article, td, th, dt, dd",
+    )
+    .unwrap();
 
     let seletor_nav = Selector::parse(
         "nav *, aside *, header *, footer *, \
-         .sidebar *, .navigation *, [role='navigation'] *"
-    ).unwrap();
+         .sidebar *, .navigation *, [role='navigation'] *",
+    )
+    .unwrap();
 
-    let nos_nav: HashSet<String> = documento
-        .select(&seletor_nav)
-        .map(|e| e.html())
-        .collect();
+    let nos_nav: HashSet<String> = documento.select(&seletor_nav).map(|e| e.html()).collect();
 
     let mut texto = String::new();
     for elemento in documento.select(&seletor_conteudo) {
@@ -633,7 +684,8 @@ pub fn extrair_texto_limpo(html: &str) -> String {
 // =============================================================================
 
 fn analisar_qualidade(texto: &str, config: &Config) -> (bool, &'static str) {
-    let linhas: Vec<&str> = texto.lines()
+    let linhas: Vec<&str> = texto
+        .lines()
         .map(|l| l.trim())
         .filter(|l| !l.is_empty())
         .collect();
@@ -669,12 +721,16 @@ fn analisar_qualidade(texto: &str, config: &Config) -> (bool, &'static str) {
     let texto_sem_quebras = texto.replace('\n', " ");
     let chars_total = texto_sem_quebras.len();
     if chars_total > 500 {
-        let pontuacao = texto_sem_quebras.chars()
+        let pontuacao = texto_sem_quebras
+            .chars()
             .filter(|&c| c == '.' || c == ',' || c == ';' || c == ':')
             .count();
         let proporcao_pontuacao = pontuacao as f64 / chars_total as f64;
         if proporcao_pontuacao < config.qualidade_min_pontuacao_pct && total > 30 {
-            return (false, "ausencia de pontuacao (provavelmente lista de titulos)");
+            return (
+                false,
+                "ausencia de pontuacao (provavelmente lista de titulos)",
+            );
         }
     }
 
@@ -864,7 +920,16 @@ fn processar_pagina<S: IngestStore>(
         if *inseridos >= max_paginas {
             break;
         }
-        processar_pdf(store, &pdf_url, domain, inseridos, ignorados, erros, max_paginas, config);
+        processar_pdf(
+            store,
+            &pdf_url,
+            domain,
+            inseridos,
+            ignorados,
+            erros,
+            max_paginas,
+            config,
+        );
         std::thread::sleep(std::time::Duration::from_millis(config.delay_ms));
     }
 
@@ -914,15 +979,14 @@ fn processar_pagina<S: IngestStore>(
 // CRAWLER BFS
 // =============================================================================
 
-fn coletar_crawling<S: IngestStore>(
-    store: &mut S,
-    fonte: &FonteConfig,
-    config: &Config,
-) {
+fn coletar_crawling<S: IngestStore>(store: &mut S, fonte: &FonteConfig, config: &Config) {
     // max_paginas da fonte sobrescreve o global se definido
     let max_paginas = fonte.max_paginas.unwrap_or(config.max_paginas);
 
-    println!("\n[FONTE] {} ({}) â€” limite {} pÃ¡ginas", fonte.url, fonte.domain, max_paginas);
+    println!(
+        "\n[FONTE] {} ({}) â€” limite {} pÃ¡ginas",
+        fonte.url, fonte.domain, max_paginas
+    );
 
     let mut visitados: HashSet<String> = HashSet::new();
     let mut fila: VecDeque<(String, usize)> = VecDeque::new();
@@ -971,9 +1035,17 @@ fn coletar_crawling<S: IngestStore>(
                 };
 
                 processar_pagina(
-                    store, &url_atual, fonte.domain, fonte.doc_type, &html,
-                    &mut inseridos, &mut ignorados_duplicados, &mut filtrados, &mut erros,
-                    max_paginas, config,
+                    store,
+                    &url_atual,
+                    fonte.domain,
+                    fonte.doc_type,
+                    &html,
+                    &mut inseridos,
+                    &mut ignorados_duplicados,
+                    &mut filtrados,
+                    &mut erros,
+                    max_paginas,
+                    config,
                 );
 
                 for link in links {
@@ -1005,7 +1077,8 @@ fn hash_nvd_estavel(json_bruto: &str) -> String {
     // Tenta parsear e extrair apenas campos que nÃ£o variam
     if let Ok(valor) = serde_json::from_str::<serde_json::Value>(json_bruto) {
         if let Some(vulnerabilidades) = valor["vulnerabilities"].as_array() {
-            let campos_estaveis: Vec<serde_json::Value> = vulnerabilidades.iter()
+            let campos_estaveis: Vec<serde_json::Value> = vulnerabilidades
+                .iter()
                 .filter_map(|v| {
                     let cve = v.get("cve")?;
                     Some(serde_json::json!({
@@ -1017,8 +1090,8 @@ fn hash_nvd_estavel(json_bruto: &str) -> String {
                 })
                 .collect();
 
-            let conteudo_estavel = serde_json::to_string(&campos_estaveis)
-                .unwrap_or_else(|_| json_bruto.to_string());
+            let conteudo_estavel =
+                serde_json::to_string(&campos_estaveis).unwrap_or_else(|_| json_bruto.to_string());
             return calcular_hash(&conteudo_estavel);
         }
     }
@@ -1044,7 +1117,9 @@ fn coletar_nvd<S: IngestStore>(store: &mut S) {
     let mut inicio = 0;
 
     loop {
-        if inicio >= max_cves { break; }
+        if inicio >= max_cves {
+            break;
+        }
 
         let source_url = format!("nvd-api-cves-{}-{}", inicio, inicio + por_pagina);
         let api_url = format!(
@@ -1062,14 +1137,17 @@ fn coletar_nvd<S: IngestStore>(store: &mut S) {
             match http.get(&api_url).send() {
                 Ok(resp) => {
                     if resp.status().as_u16() == 429 {
-                        let aguardar = resp.headers()
+                        let aguardar = resp
+                            .headers()
                             .get("retry-after")
                             .and_then(|v| v.to_str().ok())
                             .and_then(|s| s.parse::<u64>().ok())
                             .unwrap_or(60);
                         eprintln!("  [RATE LIMIT NVD] aguardando {}s", aguardar);
                         std::thread::sleep(std::time::Duration::from_secs(aguardar));
-                        if tentativa >= max_tentativas { break Err("rate limit excedido".to_string()); }
+                        if tentativa >= max_tentativas {
+                            break Err("rate limit excedido".to_string());
+                        }
                         continue;
                     }
                     match resp.text() {
@@ -1103,14 +1181,25 @@ fn coletar_nvd<S: IngestStore>(store: &mut S) {
                         inseridos += 1;
                     }
                     None => {
-                        match inserir_documento(store, &source_url, "security", "cve", &conteudo, &hash) {
+                        match inserir_documento(
+                            store,
+                            &source_url,
+                            "security",
+                            "cve",
+                            &conteudo,
+                            &hash,
+                        ) {
                             Ok(_) => {
                                 inseridos += 1;
                                 println!("  [OK] {} ({} bytes)", source_url, conteudo.len());
                             }
                             Err(e) => {
-                                if e_erro_duplicata(&e) { ignorados_duplicados += 1; }
-                                else { erros += 1; eprintln!("  [ERRO DB] {:?}", e); }
+                                if e_erro_duplicata(&e) {
+                                    ignorados_duplicados += 1;
+                                } else {
+                                    erros += 1;
+                                    eprintln!("  [ERRO DB] {:?}", e);
+                                }
                             }
                         }
                     }
@@ -1130,7 +1219,10 @@ fn coletar_nvd<S: IngestStore>(store: &mut S) {
         std::thread::sleep(std::time::Duration::from_secs(6));
     }
 
-    println!("  [RESUMO NVD] inseridos={} ignorados_duplicados={} ignorados_binarios={} erros={}", inseridos, ignorados_duplicados, ignorados_binarios, erros);
+    println!(
+        "  [RESUMO NVD] inseridos={} ignorados_duplicados={} ignorados_binarios={} erros={}",
+        inseridos, ignorados_duplicados, ignorados_binarios, erros
+    );
 }
 
 // =============================================================================
@@ -1145,7 +1237,10 @@ fn init_logging() {
         .trim()
         .eq_ignore_ascii_case("production");
     if is_production {
-        tracing_subscriber::fmt().with_env_filter(filter).json().init();
+        tracing_subscriber::fmt()
+            .with_env_filter(filter)
+            .json()
+            .init();
     } else {
         tracing_subscriber::fmt().with_env_filter(filter).init();
     }
@@ -1188,57 +1283,133 @@ fn main() {
     // -------------------------------------------------------------------------
     // SECURITY
     // -------------------------------------------------------------------------
-    coletar_crawling(&mut client, &FonteConfig::new("https://owasp.org/Top10/2025/", "security", "documentation"), &config);
-    coletar_crawling(&mut client, &FonteConfig::new("https://www.rfc-editor.org/rfc/rfc8446", "security", "rfc"), &config);
-    coletar_crawling(&mut client, &FonteConfig::new("https://www.nist.gov/cyberframework", "security", "documentation"), &config);
+    coletar_crawling(
+        &mut client,
+        &FonteConfig::new("https://owasp.org/Top10/2025/", "security", "documentation"),
+        &config,
+    );
+    coletar_crawling(
+        &mut client,
+        &FonteConfig::new("https://www.rfc-editor.org/rfc/rfc8446", "security", "rfc"),
+        &config,
+    );
+    coletar_crawling(
+        &mut client,
+        &FonteConfig::new(
+            "https://www.nist.gov/cyberframework",
+            "security",
+            "documentation",
+        ),
+        &config,
+    );
     coletar_nvd(&mut client);
 
     // -------------------------------------------------------------------------
     // RUST
     // -------------------------------------------------------------------------
-    coletar_crawling(&mut client, &FonteConfig::new("https://doc.rust-lang.org/stable/reference/", "rust", "documentation"), &config);
-    coletar_crawling(&mut client, &FonteConfig::new("https://doc.rust-lang.org/nomicon/", "rust", "documentation"), &config);
-    coletar_crawling(&mut client, &FonteConfig::new("https://doc.rust-lang.org/book/", "rust", "documentation"), &config);
-    coletar_crawling(&mut client, &FonteConfig::new("https://doc.rust-lang.org/std/", "rust", "documentation"), &config);
-    coletar_crawling(&mut client, &FonteConfig::new("https://doc.rust-lang.org/cargo/", "rust", "documentation"), &config);
+    coletar_crawling(
+        &mut client,
+        &FonteConfig::new(
+            "https://doc.rust-lang.org/stable/reference/",
+            "rust",
+            "documentation",
+        ),
+        &config,
+    );
+    coletar_crawling(
+        &mut client,
+        &FonteConfig::new(
+            "https://doc.rust-lang.org/nomicon/",
+            "rust",
+            "documentation",
+        ),
+        &config,
+    );
+    coletar_crawling(
+        &mut client,
+        &FonteConfig::new("https://doc.rust-lang.org/book/", "rust", "documentation"),
+        &config,
+    );
+    coletar_crawling(
+        &mut client,
+        &FonteConfig::new("https://doc.rust-lang.org/std/", "rust", "documentation"),
+        &config,
+    );
+    coletar_crawling(
+        &mut client,
+        &FonteConfig::new("https://doc.rust-lang.org/cargo/", "rust", "documentation"),
+        &config,
+    );
 
     // -------------------------------------------------------------------------
     // INFRA â€” kernel.org com limite maior por ter muito mais conteÃºdo
     // -------------------------------------------------------------------------
-    coletar_crawling(&mut client,
-        &FonteConfig::new("https://www.kernel.org/doc/html/latest/", "infra", "documentation")
-            .com_limite(500),
-        &config);
-    coletar_crawling(&mut client, &FonteConfig::new("https://docs.docker.com/", "infra", "documentation"), &config);
-    coletar_crawling(&mut client,
-        &FonteConfig::new("https://www.postgresql.org/docs/17/", "infra", "documentation")
-            .com_limite(200),
-        &config);
-    coletar_crawling(&mut client, &FonteConfig::new("https://systemd.io/", "infra", "documentation"), &config);
+    coletar_crawling(
+        &mut client,
+        &FonteConfig::new(
+            "https://www.kernel.org/doc/html/latest/",
+            "infra",
+            "documentation",
+        )
+        .com_limite(500),
+        &config,
+    );
+    coletar_crawling(
+        &mut client,
+        &FonteConfig::new("https://docs.docker.com/", "infra", "documentation"),
+        &config,
+    );
+    coletar_crawling(
+        &mut client,
+        &FonteConfig::new(
+            "https://www.postgresql.org/docs/17/",
+            "infra",
+            "documentation",
+        )
+        .com_limite(200),
+        &config,
+    );
+    coletar_crawling(
+        &mut client,
+        &FonteConfig::new("https://systemd.io/", "infra", "documentation"),
+        &config,
+    );
 
     // -------------------------------------------------------------------------
     // MLOPS
     // -------------------------------------------------------------------------
-    coletar_crawling(&mut client, &FonteConfig::new("https://arxiv.org/abs/2305.14314", "mlops", "paper"), &config);
-    coletar_crawling(&mut client, &FonteConfig::new("https://huggingface.co/docs/peft/", "mlops", "documentation"), &config);
-    coletar_crawling(&mut client, &FonteConfig::new("https://huggingface.co/docs/transformers/", "mlops", "documentation"), &config);
-    coletar_crawling(&mut client, &FonteConfig::new("https://raw.githubusercontent.com/ggerganov/llama.cpp/master/README.md", "mlops", "documentation"), &config);
+    coletar_crawling(
+        &mut client,
+        &FonteConfig::new("https://arxiv.org/abs/2305.14314", "mlops", "paper"),
+        &config,
+    );
+    coletar_crawling(
+        &mut client,
+        &FonteConfig::new(
+            "https://huggingface.co/docs/peft/",
+            "mlops",
+            "documentation",
+        ),
+        &config,
+    );
+    coletar_crawling(
+        &mut client,
+        &FonteConfig::new(
+            "https://huggingface.co/docs/transformers/",
+            "mlops",
+            "documentation",
+        ),
+        &config,
+    );
+    coletar_crawling(
+        &mut client,
+        &FonteConfig::new(
+            "https://raw.githubusercontent.com/ggerganov/llama.cpp/master/README.md",
+            "mlops",
+            "documentation",
+        ),
+        &config,
+    );
 
     println!("\nColeta finalizada.");
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

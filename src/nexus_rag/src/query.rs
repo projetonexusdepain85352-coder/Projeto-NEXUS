@@ -58,7 +58,9 @@ impl QdrantSearch for Qdrant {
     }
 
     async fn collection_exists(&self, collection: &str) -> Result<bool> {
-        Qdrant::collection_exists(self, collection).await.map_err(qdrant_err)
+        Qdrant::collection_exists(self, collection)
+            .await
+            .map_err(qdrant_err)
     }
 
     async fn search_points(
@@ -330,17 +332,3 @@ fn word_wrap(text: &str, width: usize) -> Vec<String> {
 
     lines
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

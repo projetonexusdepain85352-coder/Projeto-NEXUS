@@ -7,6 +7,6 @@ pub mod clean;
 pub mod dataset;
 pub mod db;
 pub mod error;
-pub mod trainer;
 #[path = "main.rs"]
 pub mod main_impl;
+pub mod trainer;

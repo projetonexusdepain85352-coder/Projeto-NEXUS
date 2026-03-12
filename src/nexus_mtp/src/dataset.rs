@@ -4,8 +4,8 @@ use std::{
     path::PathBuf,
 };
 
-use chrono::Utc;
 use async_trait::async_trait;
+use chrono::Utc;
 use serde::Serialize;
 use sqlx::PgPool;
 use tracing::{info, warn};
@@ -13,7 +13,7 @@ use uuid::Uuid;
 
 use crate::clean::clean_document_text;
 use crate::{
-    db::{fetch_approved_documents, mark_training_eligible, ApprovedDocument},
+    db::{ApprovedDocument, fetch_approved_documents, mark_training_eligible},
     error::{MtpError, Result},
 };
 
@@ -185,5 +185,3 @@ mod tests {
         assert_eq!(chunks.len(), 1);
     }
 }
-
-

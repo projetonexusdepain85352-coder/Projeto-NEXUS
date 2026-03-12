@@ -278,8 +278,3 @@ fn parse_log_line(line: &str) -> Option<LogEntry> {
         loss: v.get("loss").and_then(|l| l.as_f64()).map(|l| l as f32),
     })
 }
-
-
-
-
-

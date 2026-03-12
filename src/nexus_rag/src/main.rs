@@ -6,9 +6,9 @@ mod db;
 mod embedder;
 mod error;
 mod indexer;
+mod metrics;
 mod qdrant_builder;
 mod query;
-mod metrics;
 
 // FIX 3: todos os imports no topo — sem `use` dentro de funções,
 // sem duplicatas entre run_status() e count_distinct_docs().
