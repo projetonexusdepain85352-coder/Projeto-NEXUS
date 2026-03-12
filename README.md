@@ -1,37 +1,66 @@
 ﻿# Projeto N.E.X.U.S
 
-## Visão Geral
-NEXUS é um sistema de IA privada com coleta, validação humana, indexação RAG e pipeline de treino especializado.
+[![CI](https://github.com/projetonexusdepain85352-coder/Projeto-NEXUS/actions/workflows/ci.yml/badge.svg)](https://github.com/projetonexusdepain85352-coder/Projeto-NEXUS/actions/workflows/ci.yml)
+[![Coverage](https://codecov.io/gh/projetonexusdepain85352-coder/Projeto-NEXUS/graph/badge.svg)](https://codecov.io/gh/projetonexusdepain85352-coder/Projeto-NEXUS)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-## Arquitetura (alto nível)
-- `src/agente_intermediario`: coleta de fontes técnicas e ingestão no PostgreSQL.
-- `src/validador`: validação humana/TUI dos documentos.
-- `src/nexus_rag`: indexação em Qdrant e consulta grounded.
-- `src/nexus_mtp`: extração de dataset, treino, benchmark, aprovação e deploy de modelo.
-- `src/nexus_control_server`: painel web e orquestração operacional dos serviços.
-- `src/nexus_sugestor`: serviço auxiliar de sugestão usado no fluxo do validador.
+## Visao Geral
+NEXUS e um sistema de IA privada com coleta, validacao humana, indexacao RAG e pipeline de treino especializado.
 
-## Estrutura do Repositório
-- `src/`: código-fonte dos módulos.
-- `config/`: scripts operacionais, exemplos de ambiente e configs auxiliares.
-- `database/`: migrações e schema de referência.
-- `docs/`: documentação de arquitetura e runbooks.
-- `.ai/`: documentação para agentes de IA.
-- `tests/`: espaço para integração/e2e.
+## Arquitetura (alto nivel)
+```mermaid
+flowchart LR
+  A["agente_intermediario"] --> B["PostgreSQL"]
+  V["validador"] --> B
+  S["nexus_sugestor"] --> V
+  B --> R["nexus_rag"]
+  R --> Q["Qdrant"]
+  B --> M["nexus_mtp"]
+  M --> X["Modelos"]
+  C["nexus_control_server"] --> A
+  C --> V
+  C --> R
+  C --> M
+```
 
-## Pré-requisitos Globais
-- Rust (toolchain estável) e Cargo.
-- Python 3.
-- PostgreSQL e Qdrant acessíveis.
-- (Opcional) Docker/WSL para ambiente de operação atual.
+## Estrutura do Repositorio
+- `src/`: codigo-fonte dos modulos.
+- `config/`: scripts operacionais e configs auxiliares.
+- `database/`: migracoes e schema de referencia.
+- `docs/`: documentacao de arquitetura e runbooks.
+- `tests/`: testes unitarios e de integracao.
 
-## Como rodar do zero (5 passos)
-1. Clonar o repositório e entrar na raiz.
-2. Configurar variáveis de ambiente (ver `config/env` e READMEs dos módulos).
-3. Inicializar banco (ver `database/README.md`).
-4. Compilar módulos Rust via workspace (`cargo build --workspace`).
-5. Iniciar serviços na ordem: coleta/validação -> RAG -> MTP -> painel de controle.
+## Quick Start (minimo)
+1. Defina variaveis de ambiente essenciais:
+```bash
+export KB_READER_PASSWORD=... 
+export KB_INGEST_PASSWORD=...
+export POSTGRES_HOST=localhost
+export POSTGRES_PORT=5433
+export POSTGRES_DB=knowledge_base
+export QDRANT_URL=http://localhost:6333
+```
+2. Compile o workspace:
+```bash
+cargo build --workspace
+```
+3. Fluxo basico:
+```bash
+cargo run -p agente_intermediario
+cargo run -p nexus_validador
+cargo run -p nexus_rag -- status
+cargo run -p nexus_mtp -- status
+python3 src/nexus_control_server/server.py
+```
 
-## Referências
-- Política de grounding: `docs/architecture/NEXUS_GROUNDING_POLICY.md`.
-- Runbook legado do painel: `docs/runbooks/nexus_control_server_README.md`.
+## Documentacao de API
+- `docs/api/nexus_control_server.md`
+- `docs/api/nexus_rag.md`
+- `docs/api/nexus_mtp.md`
+
+## Contribuicao
+Ao contribuir, voce concorda em licenciar suas contribuicoes sob a Apache-2.0.
+
+## Referencias
+- Politica de grounding: `docs/architecture/NEXUS_GROUNDING_POLICY.md`
+- Runbook legado do painel: `docs/runbooks/nexus_control_server_README.md`
