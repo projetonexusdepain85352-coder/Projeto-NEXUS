@@ -98,14 +98,23 @@ enum Commands {
     },
 }
 
+fn init_logging() {
+    let filter = tracing_subscriber::EnvFilter::from_default_env()
+        .add_directive("nexus_mtp=info".parse().unwrap());
+    let is_production = std::env::var("NEXUS_ENV")
+        .unwrap_or_default()
+        .trim()
+        .eq_ignore_ascii_case("production");
+    if is_production {
+        tracing_subscriber::fmt().with_env_filter(filter).json().init();
+    } else {
+        tracing_subscriber::fmt().with_env_filter(filter).init();
+    }
+}
+
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive("nexus_mtp=info".parse().unwrap()),
-        )
-        .init();
+    init_logging();
     if let Err(e) = run(Cli::parse()).await {
         eprintln!("\n[ERRO] {}", e);
         std::process::exit(1);

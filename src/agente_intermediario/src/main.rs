@@ -1137,8 +1137,24 @@ fn coletar_nvd<S: IngestStore>(store: &mut S) {
 // MAIN
 // =============================================================================
 
+fn init_logging() {
+    let filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
+    let is_production = std::env::var("NEXUS_ENV")
+        .unwrap_or_default()
+        .trim()
+        .eq_ignore_ascii_case("production");
+    if is_production {
+        tracing_subscriber::fmt().with_env_filter(filter).json().init();
+    } else {
+        tracing_subscriber::fmt().with_env_filter(filter).init();
+    }
+}
+
 fn main() {
+    init_logging();
     let senha = std::env::var("KB_INGEST_PASSWORD").unwrap_or_else(|_| {
+        tracing::error!("KB_INGEST_PASSWORD nao definida");
         eprintln!("[ERRO] Variavel de ambiente KB_INGEST_PASSWORD nao definida.");
         std::process::exit(1);
     });
@@ -1158,11 +1174,13 @@ fn main() {
     let mut client = match postgres::Client::connect(&conn_str, postgres::NoTls) {
         Ok(c) => c,
         Err(e) => {
+            tracing::error!(error = %e, "Falha ao conectar ao banco");
             eprintln!("[ERRO] Falha ao conectar ao banco: {}", e);
             std::process::exit(1);
         }
     };
 
+    tracing::info!("Conectado ao banco. Iniciando coleta");
     println!("Conectado ao banco. Iniciando coleta...\n");
 
     let config = Config::default();

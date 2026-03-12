@@ -14,6 +14,8 @@ postgres = { version = "0.19.12", features = ["with-uuid-1"] }
 
 chrono = "0.4.38"
 serde_json = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 ureq = { version = "2", features = ["json"] }
 
 [profile.release]
