@@ -119,6 +119,26 @@ def render_metrics() -> str:
 
     return "\n".join(lines) + "\n"
 
+def _tcp_check(host: str, port: int, timeout: float = 1.5) -> tuple:
+    try:
+        sock = socket.create_connection((host, port), timeout=timeout)
+        sock.close()
+        return True, ""
+    except Exception as exc:
+        return False, str(exc)
+
+def _qdrant_host_port() -> tuple:
+    raw = os.environ.get("QDRANT_URL", "http://127.0.0.1:6333").strip()
+    parsed = urlparse(raw)
+    host = parsed.hostname or "127.0.0.1"
+    if parsed.port:
+        port = parsed.port
+    elif parsed.scheme in {"https", "grpcs"}:
+        port = 443
+    else:
+        port = 6333
+    return host, int(port)
+
 def read_json(path: Path, default):
     if not path.exists():
         return default
@@ -1015,6 +1035,43 @@ def make_handler(manager: ServiceManager):
                         body,
                         "text/plain; version=0.0.4; charset=utf-8",
                     )
+
+                if parsed.path == "/health":
+                    return json_response(self, 200, {"status": "ok", "timestamp": now_iso()})
+
+                if parsed.path == "/health/ready":
+                    pg_host = (os.environ.get("POSTGRES_HOST", "localhost") or "localhost").strip()
+                    pg_port_raw = os.environ.get("POSTGRES_PORT", "5433") or "5433"
+                    try:
+                        pg_port = int(pg_port_raw)
+                    except ValueError:
+                        pg_port = 5433
+
+                    pg_ok, pg_err = _tcp_check(pg_host, pg_port)
+                    q_host, q_port = _qdrant_host_port()
+                    q_ok, q_err = _tcp_check(q_host, q_port)
+
+                    status = "ok" if (pg_ok and q_ok) else "unready"
+                    payload = {
+                        "status": status,
+                        "timestamp": now_iso(),
+                        "checks": {
+                            "postgres": {
+                                "ok": pg_ok,
+                                "host": pg_host,
+                                "port": pg_port,
+                                **({"error": pg_err} if not pg_ok else {}),
+                            },
+                            "qdrant": {
+                                "ok": q_ok,
+                                "host": q_host,
+                                "port": q_port,
+                                **({"error": q_err} if not q_ok else {}),
+                            },
+                        },
+                    }
+                    code = 200 if status == "ok" else 503
+                    return json_response(self, code, payload)
 
                 if parsed.path == "/api/health":
                     return json_response(self, 200, {"status": "ok", "time": now_iso()})

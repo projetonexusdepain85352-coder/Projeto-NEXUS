@@ -155,3 +155,22 @@ Exposicao Prometheus com counters:
 - `nexus_rag_queries_total{result="found|denied|below_threshold"}`
 - `nexus_models_trained_total{result="approved|rejected"}`
 - `nexus_http_requests_total{method,path,status}`
+
+### GET /health
+Resposta: 200
+```json
+{"status":"ok","timestamp":"2026-03-12T12:00:00Z"}
+```
+
+### GET /health/ready
+Resposta: 200 (ok) ou 503 (unready)
+```json
+{
+  "status":"ok",
+  "timestamp":"2026-03-12T12:00:00Z",
+  "checks":{
+    "postgres":{"ok":true,"host":"localhost","port":5433},
+    "qdrant":{"ok":true,"host":"127.0.0.1","port":6333}
+  }
+}
+```
