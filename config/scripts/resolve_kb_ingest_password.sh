@@ -14,11 +14,6 @@ nexus_resolve_kb_ingest_password() {
   local -a candidates=()
   [[ -n "${KB_INGEST_PASSWORD:-}" ]] && candidates+=("$KB_INGEST_PASSWORD")
   [[ -n "${NEXUS_KB_INGEST_PASSWORD:-}" ]] && candidates+=("$NEXUS_KB_INGEST_PASSWORD")
-  candidates+=(
-    "kb_ingest_copy_local"
-    "KbIngest2026seCCKDS88448cure"
-    "123"
-  )
 
   local seen='|'
   local cand

@@ -22,8 +22,10 @@ export POSTGRES_HOST="${POSTGRES_HOST:-$COPY_HOST}"
 export POSTGRES_PORT="${POSTGRES_PORT:-5433}"
 export POSTGRES_DB="${POSTGRES_DB:-knowledge_base}"
 export POSTGRES_USER="${POSTGRES_USER:-kb_reader}"
-export KB_READER_PASSWORD="${KB_READER_PASSWORD:-kb_reader_copy_local}"
-export KB_INGEST_PASSWORD="${KB_INGEST_PASSWORD:-kb_ingest_copy_local}"
+: "${KB_READER_PASSWORD:?Defina KB_READER_PASSWORD antes de iniciar a copia}"
+export KB_READER_PASSWORD
+: "${KB_INGEST_PASSWORD:?Defina KB_INGEST_PASSWORD antes de iniciar a copia}"
+export KB_INGEST_PASSWORD
 export QDRANT_URL="${QDRANT_URL:-http://$COPY_HOST:6335}"
 export NEXUS_ENV="${NEXUS_ENV:-development}"
 

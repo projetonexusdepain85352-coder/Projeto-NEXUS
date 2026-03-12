@@ -1,4 +1,4 @@
-﻿# Projeto N.E.X.U.S
+# Projeto N.E.X.U.S
 
 [![CI](https://github.com/projetonexusdepain85352-coder/Projeto-NEXUS/actions/workflows/ci.yml/badge.svg)](https://github.com/projetonexusdepain85352-coder/Projeto-NEXUS/actions/workflows/ci.yml)
 [![Coverage](https://codecov.io/gh/projetonexusdepain85352-coder/Projeto-NEXUS/graph/badge.svg)](https://codecov.io/gh/projetonexusdepain85352-coder/Projeto-NEXUS)
@@ -40,6 +40,7 @@ export POSTGRES_PORT=5433
 export POSTGRES_DB=knowledge_base
 export QDRANT_URL=http://localhost:6333
 ```
+Observacao: nao existem senhas padrao; defina KB_READER_PASSWORD e KB_INGEST_PASSWORD (ou NEXUS_KB_INGEST_PASSWORD para scripts auxiliares).
 2. Compile o workspace:
 ```bash
 cargo build --workspace
