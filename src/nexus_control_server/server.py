@@ -799,7 +799,10 @@ def _send_security_headers(handler: BaseHTTPRequestHandler, is_html: bool = Fals
             "img-src 'self' data:; "
             "base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
         )
-        handler.send_header("Content-Security-Policy", csp)
+    else:
+        csp = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+
+    handler.send_header("Content-Security-Policy", csp)
 
     if _is_production():
         handler.send_header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
@@ -1214,4 +1217,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
 
