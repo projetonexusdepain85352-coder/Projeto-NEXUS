@@ -1,0 +1,28 @@
+[package]
+name = "nexus_rag_agent"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "nexus_agent_server"
+path = "src/bin/server.rs"
+
+[dependencies]
+nexus_rag = { path = "../nexus_rag" }
+tokio = { version = "1.43", features = ["full"] }
+anyhow = "1.0"
+thiserror = "2.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "postgres", "uuid", "chrono", "tls-rustls"] }
+fastembed = "4.3.0"
+qdrant-client = "1.12.1"
+clap = { version = "4.5", features = ["derive"] }
+axum = "0.7"
+reqwest = { version = "0.12", features = ["json", "rustls-tls"] }

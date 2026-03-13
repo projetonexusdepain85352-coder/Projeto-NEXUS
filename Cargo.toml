@@ -9,6 +9,7 @@ members = [
   "src/agente_intermediario",
   "src/nexus_rag",
   "src/nexus_mtp",
+  "src/nexus_rag_agent",
   "src/validador"
 ]
 resolver = "2"

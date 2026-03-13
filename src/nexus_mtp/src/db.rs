@@ -102,6 +102,7 @@ impl<'r> sqlx::FromRow<'r, PgRow> for DomainValidationStats {
         })
     }
 }
+
 pub async fn fetch_approved_documents(
     pool: &PgPool,
     domain: &str,
@@ -119,6 +120,35 @@ pub async fn fetch_approved_documents(
     )
     .bind(domain)
     .bind(limit)
+    .fetch_all(pool)
+    .await?)
+}
+
+pub async fn fetch_approved_documents_any(
+    pool: &PgPool,
+    domain: Option<&str>,
+) -> Result<Vec<ApprovedDocument>> {
+    if let Some(domain) = domain {
+        return Ok(sqlx::query_as::<_, ApprovedDocument>(
+            "SELECT d.id, d.content, d.source, d.domain
+             FROM documents d
+             JOIN validation v ON v.document_id = d.id
+             WHERE v.status = 'approved'
+               AND d.domain = $1
+             ORDER BY d.content_length DESC",
+        )
+        .bind(domain)
+        .fetch_all(pool)
+        .await?);
+    }
+
+    Ok(sqlx::query_as::<_, ApprovedDocument>(
+        "SELECT d.id, d.content, d.source, d.domain
+         FROM documents d
+         JOIN validation v ON v.document_id = d.id
+         WHERE v.status = 'approved'
+         ORDER BY d.content_length DESC",
+    )
     .fetch_all(pool)
     .await?)
 }
@@ -322,6 +352,7 @@ pub async fn domain_validation_stats(pool: &PgPool) -> Result<Vec<DomainValidati
     .fetch_all(pool)
     .await?)
 }
+
 pub async fn active_model_per_domain(pool: &PgPool) -> Result<Vec<(String, Option<String>)>> {
     Ok(
         sqlx::query_as("SELECT domain, name FROM models WHERE status = 'deployed' ORDER BY domain")

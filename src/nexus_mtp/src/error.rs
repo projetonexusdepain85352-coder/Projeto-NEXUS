@@ -8,6 +8,8 @@ pub enum MtpError {
     Io(#[from] std::io::Error),
     #[error("Erro de serializacao JSON: {0}")]
     Json(#[from] serde_json::Error),
+    #[error("Erro HTTP: {0}")]
+    Http(#[from] reqwest::Error),
     #[error("Modelo nao encontrado: {0}")]
     ModelNotFound(String),
     #[error("Dominio invalido: '{0}'. Use: rust | infra | security | mlops")]

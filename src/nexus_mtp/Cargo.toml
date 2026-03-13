@@ -29,4 +29,5 @@ candle-core         = { git = "https://github.com/huggingface/candle", package =
 candle-transformers = { git = "https://github.com/huggingface/candle", package = "candle-transformers" }
 candle-nn           = { git = "https://github.com/huggingface/candle", package = "candle-nn" }
 tokenizers          = "0.21"
-
+reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
+nexus_rag_agent = { path = "../nexus_rag_agent" }

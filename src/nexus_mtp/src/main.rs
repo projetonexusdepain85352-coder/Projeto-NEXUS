@@ -58,6 +58,15 @@ enum Commands {
         #[arg(long, default_value = "1000")]
         max_samples: i64,
     },
+    /// Gera dataset JSONL para o RAG Agent
+    GenerateRagDataset {
+        #[arg(long)]
+        domain: Option<String>,
+        #[arg(long)]
+        output: Option<PathBuf>,
+        #[arg(long, default_value_t = 3)]
+        samples_per_doc: usize,
+    },
     /// Treina modelo com QLoRA via unsloth
     Train {
         #[arg(long)]
@@ -142,6 +151,13 @@ async fn run(cli: Cli) -> Result<()> {
             domain,
             max_samples,
         } => cmd_extract(&pool, &domain, max_samples).await?,
+        Commands::GenerateRagDataset {
+            domain,
+            output,
+            samples_per_doc,
+        } => {
+            cmd_generate_rag_dataset(&pool, domain.as_deref(), output, samples_per_doc).await?
+        }
         Commands::Train {
             domain,
             dataset,
@@ -187,6 +203,33 @@ async fn cmd_extract(pool: &sqlx::PgPool, domain: &str, max_samples: i64) -> Res
         total,
         path.display()
     );
+    Ok(())
+}
+
+async fn cmd_generate_rag_dataset(
+    pool: &sqlx::PgPool,
+    domain: Option<&str>,
+    output: Option<PathBuf>,
+    samples_per_doc: usize,
+) -> Result<()> {
+    if let Some(d) = domain {
+        dataset::validate_domain(d)?;
+    }
+    let domain_label = domain.unwrap_or("all");
+    let output_path = output.unwrap_or_else(|| {
+        PathBuf::from(format!("./datasets/rag_agent_{}.jsonl", domain_label))
+    });
+
+    println!("=== NEXUS MTP -- Generate RAG Dataset ===");
+    println!("Dominio: {}", domain_label);
+    println!("Output:  {}", output_path.display());
+    println!("Samples por doc: {}", samples_per_doc);
+
+    let stats = dataset::generate_rag_dataset(pool, domain, &output_path, samples_per_doc).await?;
+
+    println!("\nDocumentos: {}", stats.documents);
+    println!("Pares gerados: {}", stats.pairs);
+    println!("Dominios: {}", stats.domains.join(", "));
     Ok(())
 }
 
@@ -578,3 +621,4 @@ fn load_doc_ids_from_sidecar(dataset: &Path) -> Result<Vec<Uuid>> {
     tracing::info!("{} IDs carregados do sidecar.", ids.len());
     Ok(ids)
 }
+

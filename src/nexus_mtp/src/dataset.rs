@@ -1,24 +1,27 @@
 use std::{
     fs,
     io::{BufWriter, Write},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use async_trait::async_trait;
 use chrono::Utc;
-use serde::Serialize;
+use reqwest::Client;
+use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use tracing::{info, warn};
 use uuid::Uuid;
 
 use crate::clean::clean_document_text;
 use crate::{
-    db::{ApprovedDocument, fetch_approved_documents, mark_training_eligible},
+    db::{ApprovedDocument, fetch_approved_documents, fetch_approved_documents_any, mark_training_eligible},
     error::{MtpError, Result},
 };
 
 const CHUNK_WORDS: usize = 1024;
 const OVERLAP_WORDS: usize = 128;
+const DEFAULT_OLLAMA_URL: &str = "http://localhost:11434";
+const NEGATIVE_RESPONSE: &str = "GROUNDING_DENIED: Nao ha evidencia sobre este tema no banco de dados.";
 
 #[derive(Debug, Serialize)]
 pub struct AlpacaExample {
@@ -69,7 +72,7 @@ pub async fn extract_with_store<S: DatasetStore + Sync>(
     datasets_dir: &str,
 ) -> Result<(PathBuf, Vec<Uuid>, usize)> {
     validate_domain(domain)?;
-    info!("Buscando documentos aprovados para domínio '{}'...", domain);
+    info!("Buscando documentos aprovados para dominio '{}'...", domain);
     let docs = store.fetch_approved_documents(domain, max_samples).await?;
     if docs.is_empty() {
         return Err(MtpError::NoDocuments(domain.to_string()));
@@ -132,6 +135,166 @@ pub async fn extract_with_store<S: DatasetStore + Sync>(
     info!("IDs salvos em: {}", ids_path.display());
     Ok((path, doc_ids, total_examples))
 }
+
+#[derive(Debug, Serialize)]
+struct RagMessage {
+    role: String,
+    content: String,
+}
+
+#[derive(Debug, Serialize)]
+struct RagExample {
+    messages: Vec<RagMessage>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GeneratedQA {
+    pergunta: String,
+    resposta: String,
+}
+
+#[derive(Debug, Serialize)]
+struct OllamaRequest {
+    model: String,
+    prompt: String,
+    stream: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct OllamaResponse {
+    response: String,
+}
+
+pub struct RagStats {
+    pub documents: usize,
+    pub pairs: usize,
+    pub domains: Vec<String>,
+}
+
+pub async fn generate_rag_dataset(
+    pool: &PgPool,
+    domain: Option<&str>,
+    output: &Path,
+    samples_per_doc: usize,
+) -> Result<RagStats> {
+    let docs = fetch_approved_documents_any(pool, domain).await?;
+    if docs.is_empty() {
+        let label = domain.unwrap_or("all");
+        return Err(MtpError::NoDocuments(label.to_string()));
+    }
+
+    let base_url = std::env::var("NEXUS_OLLAMA_URL").unwrap_or_else(|_| DEFAULT_OLLAMA_URL.to_string());
+    let ollama_url = format!("{}/api/generate", base_url.trim_end_matches('/'));
+    let model = std::env::var("NEXUS_BASE_MODEL")?;
+
+    let system_prompt = nexus_rag_agent::prompts::system_prompt();
+    let client = Client::new();
+
+    let mut examples: Vec<RagExample> = Vec::new();
+    let mut domains: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    let mut total_pairs: usize = 0;
+
+    for doc in &docs {
+        domains.insert(doc.domain.clone());
+
+        let cleaned = clean_document_text(&doc.content);
+        let chunks = chunk_text(&cleaned, CHUNK_WORDS, OVERLAP_WORDS);
+        if chunks.is_empty() {
+            warn!("Documento {} vazio apos chunking, ignorando.", doc.id);
+            continue;
+        }
+        let chunk_total = chunks.len() as i64;
+
+        for (chunk_index, chunk_text) in chunks.iter().enumerate() {
+            let generated = generate_pairs_for_chunk(
+                &client,
+                &ollama_url,
+                &model,
+                chunk_text,
+                samples_per_doc,
+            )
+            .await?;
+
+            if generated.is_empty() {
+                warn!("Chunk sem pares gerados (doc={})", doc.id);
+                continue;
+            }
+
+            for pair in generated.into_iter().take(samples_per_doc) {
+                let source = format!("{} (document_id={})", doc.source, doc.id);
+                let citation = format!(
+                    "[Fonte: {} | chunk {}/{}]",
+                    source,
+                    chunk_index + 1,
+                    chunk_total
+                );
+                let assistant_content = format!("{} {}", pair.resposta.trim(), citation);
+
+                examples.push(RagExample {
+                    messages: vec![
+                        RagMessage {
+                            role: "system".to_string(),
+                            content: system_prompt.clone(),
+                        },
+                        RagMessage {
+                            role: "user".to_string(),
+                            content: pair.pergunta.trim().to_string(),
+                        },
+                        RagMessage {
+                            role: "assistant".to_string(),
+                            content: assistant_content,
+                        },
+                    ],
+                });
+                total_pairs += 1;
+            }
+        }
+    }
+
+    let negative_count = ((total_pairs as f32) * 0.1).round() as usize;
+    if negative_count > 0 {
+        let negatives = negative_questions();
+        for i in 0..negative_count {
+            let question = negatives[i % negatives.len()].to_string();
+            examples.push(RagExample {
+                messages: vec![
+                    RagMessage {
+                        role: "system".to_string(),
+                        content: system_prompt.clone(),
+                    },
+                    RagMessage {
+                        role: "user".to_string(),
+                        content: question,
+                    },
+                    RagMessage {
+                        role: "assistant".to_string(),
+                        content: NEGATIVE_RESPONSE.to_string(),
+                    },
+                ],
+            });
+            total_pairs += 1;
+        }
+    }
+
+    if let Some(parent) = output.parent() {
+        fs::create_dir_all(parent)?;
+    }
+
+    let file = fs::File::create(output)?;
+    let mut bw = BufWriter::new(file);
+    for ex in &examples {
+        let line = serde_json::to_string(ex)?;
+        writeln!(bw, "{}", line)?;
+    }
+    bw.flush()?;
+
+    Ok(RagStats {
+        documents: docs.len(),
+        pairs: total_pairs,
+        domains: domains.into_iter().collect(),
+    })
+}
+
 pub fn chunk_text(text: &str, chunk_words: usize, overlap_words: usize) -> Vec<String> {
     let words: Vec<&str> = text.split_whitespace().collect();
     if words.is_empty() {
@@ -160,6 +323,73 @@ pub fn validate_domain(domain: &str) -> Result<()> {
         "rust" | "infra" | "security" | "mlops" => Ok(()),
         other => Err(MtpError::InvalidDomain(other.to_string())),
     }
+}
+
+async fn generate_pairs_for_chunk(
+    client: &Client,
+    url: &str,
+    model: &str,
+    chunk: &str,
+    samples_per_doc: usize,
+) -> Result<Vec<GeneratedQA>> {
+    let prompt = format!(
+        "Dado este trecho de documentacao tecnica, gere {n} perguntas em portugues que podem ser respondidas APENAS com as informacoes presentes neste trecho. Retorne JSON array: [{{\"pergunta\": \"...\", \"resposta\": \"...\"}}]\n\nTrecho:\n{chunk}",
+        n = samples_per_doc,
+        chunk = chunk
+    );
+
+    let payload = OllamaRequest {
+        model: model.to_string(),
+        prompt,
+        stream: false,
+    };
+
+    let resp = client.post(url).json(&payload).send().await?;
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        return Err(MtpError::Other(format!(
+            "Ollama error: status={} body={}",
+            status, body
+        )));
+    }
+
+    let parsed: OllamaResponse = resp.json().await?;
+    parse_generated_json(&parsed.response)
+}
+
+fn parse_generated_json(text: &str) -> Result<Vec<GeneratedQA>> {
+    let trimmed = text.trim();
+    if let Ok(items) = serde_json::from_str::<Vec<GeneratedQA>>(trimmed) {
+        return Ok(items);
+    }
+
+    let start = trimmed.find('[');
+    let end = trimmed.rfind(']');
+    if let (Some(s), Some(e)) = (start, end) {
+        let slice = &trimmed[s..=e];
+        if let Ok(items) = serde_json::from_str::<Vec<GeneratedQA>>(slice) {
+            return Ok(items);
+        }
+    }
+
+    warn!("Resposta do Ollama nao e JSON valido: {}", trimmed);
+    Ok(Vec::new())
+}
+
+fn negative_questions() -> Vec<&'static str> {
+    vec![
+        "Quais sao as capitais dos estados brasileiros?",
+        "Explique a teoria das cordas em detalhes.",
+        "Como configurar Kubernetes em um cluster de 100 nos?",
+        "Qual e a receita tradicional de moqueca baiana?",
+        "Qual foi o resultado da Copa do Mundo de 1994?",
+        "Como funciona a fotossintese nas plantas?",
+        "O que e a linguagem de programacao Haskell?",
+        "Qual e o significado de deep learning?",
+        "Descreva a historia do Imperio Romano.",
+        "Como calcular a area de um circulo?",
+    ]
 }
 
 #[cfg(test)]

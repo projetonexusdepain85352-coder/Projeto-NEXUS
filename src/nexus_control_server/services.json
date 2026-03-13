@@ -1,4 +1,4 @@
-﻿{
+{
   "services": {
     "sugestor": {
       "command": ["{python}", "src/nexus_sugestor/servidor.py"],
@@ -30,7 +30,34 @@
       "env": {
         "RUST_BACKTRACE": "1"
       }
+    },
+    "nexus_inference_server": {
+      "display_name": "NEXUS Inference Server",
+      "command": "${NEXUS_PROJECT_ROOT}/src/nexus_inference_server/start.sh",
+      "env": {
+        "NEXUS_BASE_MODEL": "${NEXUS_BASE_MODEL}",
+        "NEXUS_ADAPTER_PATH": "${NEXUS_ADAPTER_PATH}",
+        "NEXUS_INFERENCE_PORT": "${NEXUS_INFERENCE_PORT}",
+        "NEXUS_MODELS_DIR": "${NEXUS_MODELS_DIR}"
+      },
+      "health_check": "http://localhost:11434/health"
+    },
+    "nexus_agent_server": {
+      "display_name": "NEXUS RAG Agent",
+      "command": "${NEXUS_PROJECT_ROOT}/target/release/nexus_agent_server",
+      "env": {
+        "NEXUS_AGENT_PORT": "8765",
+        "NEXUS_OLLAMA_URL": "${NEXUS_OLLAMA_URL}",
+        "QDRANT_URL": "${QDRANT_URL}",
+        "QDRANT_API_KEY": "${QDRANT_API_KEY}",
+        "POSTGRES_HOST": "${POSTGRES_HOST}",
+        "POSTGRES_PORT": "${POSTGRES_PORT}",
+        "POSTGRES_DB": "${POSTGRES_DB}",
+        "POSTGRES_USER": "${POSTGRES_USER}",
+        "KB_READER_PASSWORD": "${KB_READER_PASSWORD}"
+      },
+      "health_check": "http://localhost:8765/health",
+      "depends_on": ["nexus_inference_server"]
     }
   }
 }
-

@@ -52,3 +52,5 @@ Thumbs.db
 # Certificados e chaves
 *.pem
 *.key
+__pycache__/
+*.pyc
