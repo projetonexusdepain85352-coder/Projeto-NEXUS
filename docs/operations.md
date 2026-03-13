@@ -1,6 +1,6 @@
-# Operação
+﻿# Operacao
 
-## Verificar se o servidor está rodando
+## Verificar se o servidor esta rodando
 
 ```
 ss -tlnp | grep 8765
@@ -37,7 +37,16 @@ docker exec pg_copia psql -U kb_admin -d knowledge_base \
 curl -s http://localhost:6335/collections
 ```
 
-## Testes rápidos
+## Operacao do control server
+
+```
+bash config/scripts/nexus_ctl.sh status
+bash config/scripts/nexus_ctl.sh start
+bash config/scripts/nexus_ctl.sh stop
+bash config/scripts/nexus_ctl.sh restart
+```
+
+## Testes rapidos
 
 ```
 curl -s http://localhost:8765/health
@@ -61,4 +70,5 @@ NEXUS_INTEGRATION_TESTS=1 cargo test --workspace -- --include-ignored
 
 - PowerShell quebra aspas em comandos complexos: prefira GitHub Desktop para push.
 - `POSTGRES_HOST` muda ao reiniciar WSL: redescobrir com `ip route | grep default | awk '{print $3}'`.
-- `QDRANT_URL` deve ser 6336 (gRPC), não 6335 (REST).
+- `QDRANT_URL` deve ser 6336 (gRPC), nao 6335 (REST).
+- `/api/logs` no control server e endpoint legado; UI atual usa `Servicos + Terminal`.

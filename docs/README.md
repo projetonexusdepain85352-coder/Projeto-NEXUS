@@ -1,16 +1,22 @@
-# NEXUS — Documentação
+﻿# NEXUS - Documentacao
 
 Plataforma de IA privada focada em conhecimento validado.
-Pipeline: coleta → validação humana → indexação RAG → agente com grounding.
+Pipeline: coleta -> validacao humana -> indexacao RAG -> agente com grounding.
 
-## Índice
+## Indice
 
-- [Visão Geral](./overview.md)
+- [Visao Geral](./overview.md)
 - [Arquitetura](./architecture.md)
 - [Setup e Ambiente](./setup.md)
 - [Crates](./crates.md)
+- [Control Server](./control-server.md)
 - [API do Agente RAG](./rag-agent-api.md)
-- [Pipeline de Ingestão](./ingestion.md)
+- [Nexus RAG CLI](./nexus-rag-cli.md)
+- [Nexus MTP](./nexus-mtp.md)
+- [Pipeline de Ingestao](./ingestion.md)
 - [Banco de Dados](./database.md)
-- [Operação](./operations.md)
+- [Operacao](./operations.md)
+- [Replicacao](./replication.md)
+- [MTP Troubleshooting (Benchmark)](./mtp-troubleshooting-benchmark.md)
+- [MTP Troubleshooting (Trainer)](./mtp-troubleshooting-trainer.md)
 - [Roadmap](./roadmap.md)

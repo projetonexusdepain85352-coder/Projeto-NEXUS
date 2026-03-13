@@ -1,4 +1,4 @@
-# API do Agente RAG
+﻿# API do Agente RAG
 
 ## Porta
 
@@ -38,9 +38,9 @@ Response JSON completo:
 
 ## denied_reason
 
-- `no_chunks`: Qdrant não retornou chunks com score ≥ 0.35.
+- `no_chunks`: Qdrant nao retornou chunks com score >= 0.35.
 - `verifier_failed`: best_score do verificador abaixo do threshold.
-- `insufficient_context`: modelo declarou falta de informação.
+- `insufficient_context`: modelo declarou falta de informacao.
 
 ## Exemplos de curl
 
@@ -65,7 +65,7 @@ curl -s -X POST http://localhost:8765/query \
   -d '{"query":"receita de bolo","domain":"security"}'
 ```
 
-## Variáveis de ambiente
+## Variaveis de ambiente
 
 - `NEXUS_OLLAMA_URL` (default http://localhost:11434)
 - `NEXUS_BASE_MODEL` (default `mistral`)

@@ -1,17 +1,17 @@
-# Banco de Dados
+﻿# Banco de Dados
 
 ## PostgreSQL (knowledge_base)
 
 Tabelas principais:
 
 - `documents`: documento bruto coletado.
-- `validation`: status de validação (`approved`, `rejected`, `pending`).
+- `validation`: status de validacao (`approved`, `rejected`, `pending`).
 - `training_cycles`: ciclos de treino (MTP).
 - `models`: modelos e adapters treinados.
-- `document_training_lineage`: vínculo documento → ciclo de treino.
-- `benchmark_questions`: perguntas usadas no benchmark (referenciado em `nexus_mtp`).
+- `document_training_lineage`: vinculo documento -> ciclo de treino.
+- `benchmark_questions`: perguntas usadas no benchmark.
 
-Colunas essenciais (documentação de referência):
+Colunas essenciais (documentacao de referencia):
 
 `documents`
 - `id` (UUID)
@@ -27,25 +27,25 @@ Colunas essenciais (documentação de referência):
 - `document_id` (UUID FK)
 - `status` (TEXT)
 
-## Usuários e permissões
+## Usuarios e permissoes
 
-- `kb_admin`: administração.
-- `kb_ingest`: ingestão e escrita.
+- `kb_admin`: administracao.
+- `kb_ingest`: ingestao e escrita.
 - `kb_reader`: leitura usada pelo RAG.
 
-Permissões mínimas para `kb_reader`:
+Permissoes minimas para `kb_reader`:
 ```
 GRANT SELECT ON documents, validation TO kb_reader;
 ```
 
 ## Qdrant
 
-Collections por domínio:
+Collections por dominio:
 - `nexus_security`
 - `nexus_rust`
 - `nexus_infra`
 - `nexus_mlops`
 
-Cada ponto contém payload com:
+Cada ponto contem payload com:
 - `document_id`, `source`, `domain`, `doc_type`
 - `chunk_index`, `chunk_total`, `chunk_text`

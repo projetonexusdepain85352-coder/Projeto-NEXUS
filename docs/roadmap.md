@@ -1,13 +1,13 @@
-# Roadmap
+﻿# Roadmap
 
 ## Curto prazo
 
 - Registrar `nexus_agent_server` no `services.json`.
 - Merge da branch `codex/feat/rag-agent-with-verifier` para `main`.
 
-## Médio prazo
+## Medio prazo
 
-- Semantic Router como camada pré-recuperação.
+- Semantic Router como camada pre-recuperacao.
 - `generate-rag-dataset` para dataset de fine-tuning.
 
 ## Longo prazo

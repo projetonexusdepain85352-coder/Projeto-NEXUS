@@ -1,4 +1,4 @@
-# NEXUS
+﻿# NEXUS
 
 Plataforma de IA privada com RAG e grounding restrito.
-Documentação completa em [/docs/](./docs/README.md).
+Documentacao completa em [/docs/](./docs/README.md).
