@@ -21,6 +21,12 @@ O pipeline coleta documentos técnicos, submete validação humana, indexa conte
 
 [PostgreSQL validated data] ---> [nexus_mtp] ---> treino/benchmark/aprovação/deploy
 
+[nexus_rag_agent] ---> [Qdrant gRPC :6336]
+                  ---> [PostgreSQL :5433]
+                  ---> [Ollama :11434]
+                  Verificador pós-geração (threshold 0.55)
+                  POST /query -> resposta grounded ou GROUNDING_DENIED
+
 [nexus_control_server] ---> start/stop/terminal dos serviços
 ```
 

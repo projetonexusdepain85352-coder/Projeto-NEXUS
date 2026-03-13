@@ -54,3 +54,8 @@ Thumbs.db
 *.key
 __pycache__/
 *.pyc
+.env.*.local
+nohup.out
+*.jsonl
+*.ids
+.fastembed_cache/
