@@ -3,28 +3,11 @@
 use nexus_rag::embedder::Embedder;
 use nexus_rag::query::QueryResult;
 
-use crate::RejectedSentence;
-
 const DEFAULT_THRESHOLD: f32 = 0.55;
-const MIN_SENTENCE_LEN: usize = 10;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SentenceStatus {
-    Supported,
-    Unsupported,
-}
-
-#[derive(Debug, Clone)]
-pub struct SentenceVerification {
-    pub sentence: String,
-    pub score: f32,
-    pub status: SentenceStatus,
-}
-
 #[derive(Debug, Clone)]
 pub struct VerificationResult {
-    pub sentences: Vec<SentenceVerification>,
-    pub all_supported: bool,
+    pub supported: bool,
+    pub best_score: f32,
 }
 
 pub struct Verifier<'a> {
@@ -53,13 +36,41 @@ impl<'a> Verifier<'a> {
         response_text: &str,
         source_chunks: &[QueryResult],
     ) -> VerificationResult {
-        let sentences = split_sentences(response_text);
-        if sentences.is_empty() || source_chunks.is_empty() {
+        if source_chunks.is_empty() {
             return VerificationResult {
-                sentences: Vec::new(),
-                all_supported: false,
+                supported: false,
+                best_score: 0.0,
             };
         }
+
+        let response = response_text.trim();
+        if response.is_empty() {
+            return VerificationResult {
+                supported: false,
+                best_score: 0.0,
+            };
+        }
+
+        let clean_response = strip_chunk_tags(response);
+        let clean_trimmed = clean_response.trim();
+        if clean_trimmed.is_empty() {
+            return VerificationResult {
+                supported: false,
+                best_score: 0.0,
+            };
+        }
+
+        let response_vec = match self.embedder.embed_one(clean_trimmed) {
+            Ok(v) => v,
+            Err(e) => {
+                tracing::error!(error = %e, "Verifier: failed to embed response");
+                return VerificationResult {
+                    supported: false,
+                    best_score: 0.0,
+                };
+            }
+        };
+        let response_norm = norm(&response_vec);
 
         let chunk_texts: Vec<String> = source_chunks
             .iter()
@@ -70,101 +81,30 @@ impl<'a> Verifier<'a> {
             Err(e) => {
                 tracing::error!(error = %e, "Verifier: failed to embed chunks");
                 return VerificationResult {
-                    sentences: sentences
-                        .into_iter()
-                        .map(|s| SentenceVerification {
-                            sentence: s,
-                            score: 0.0,
-                            status: SentenceStatus::Unsupported,
-                        })
-                        .collect(),
-                    all_supported: false,
+                    supported: false,
+                    best_score: 0.0,
                 };
             }
         };
 
         let chunk_norms: Vec<f32> = chunk_embeddings.iter().map(|v| norm(v)).collect();
 
-        let mut results = Vec::with_capacity(sentences.len());
-        let mut all_supported = true;
-
-        for sentence in sentences {
-            let sentence_vec = match self.embedder.embed_one(&sentence) {
-                Ok(v) => v,
-                Err(e) => {
-                    tracing::warn!(error = %e, "Verifier: failed to embed sentence");
-                    results.push(SentenceVerification {
-                        sentence,
-                        score: 0.0,
-                        status: SentenceStatus::Unsupported,
-                    });
-                    all_supported = false;
-                    continue;
-                }
-            };
-            let sentence_norm = norm(&sentence_vec);
-            let mut best = 0.0f32;
-            for (idx, chunk_vec) in chunk_embeddings.iter().enumerate() {
-                if sentence_vec.len() != chunk_vec.len() {
-                    continue;
-                }
-                let score = cosine_with_norms(&sentence_vec, sentence_norm, chunk_vec, chunk_norms[idx]);
-                if score > best {
-                    best = score;
-                }
+        let mut best = 0.0f32;
+        for (idx, chunk_vec) in chunk_embeddings.iter().enumerate() {
+            if response_vec.len() != chunk_vec.len() {
+                continue;
             }
-
-            let status = if best >= self.threshold {
-                SentenceStatus::Supported
-            } else {
-                all_supported = false;
-                SentenceStatus::Unsupported
-            };
-
-            results.push(SentenceVerification {
-                sentence,
-                score: best,
-                status,
-            });
+            let score = cosine_with_norms(&response_vec, response_norm, chunk_vec, chunk_norms[idx]);
+            if score > best {
+                best = score;
+            }
         }
 
         VerificationResult {
-            sentences: results,
-            all_supported,
+            supported: best >= self.threshold,
+            best_score: best,
         }
     }
-}
-
-pub fn rejected_sentences(result: &VerificationResult) -> Vec<RejectedSentence> {
-    result
-        .sentences
-        .iter()
-        .filter(|s| s.status == SentenceStatus::Unsupported)
-        .map(|s| RejectedSentence {
-            sentence: s.sentence.clone(),
-            score: s.score,
-        })
-        .collect()
-}
-
-fn split_sentences(text: &str) -> Vec<String> {
-    let mut out = Vec::new();
-    let mut current = String::new();
-    for ch in text.chars() {
-        current.push(ch);
-        if matches!(ch, '.' | '!' | '?') {
-            let trimmed = current.trim();
-            if trimmed.chars().count() >= MIN_SENTENCE_LEN {
-                out.push(trimmed.to_string());
-            }
-            current.clear();
-        }
-    }
-    let trimmed = current.trim();
-    if trimmed.chars().count() >= MIN_SENTENCE_LEN {
-        out.push(trimmed.to_string());
-    }
-    out
 }
 
 fn norm(v: &[f32]) -> f32 {
@@ -177,4 +117,44 @@ fn cosine_with_norms(a: &[f32], norm_a: f32, b: &[f32], norm_b: f32) -> f32 {
     }
     let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
     dot / (norm_a * norm_b)
+}
+
+fn strip_chunk_tags(text: &str) -> String {
+    let chars: Vec<char> = text.chars().collect();
+    let mut out = String::with_capacity(chars.len());
+    let mut i = 0usize;
+    while i < chars.len() {
+        if chars[i] == '[' {
+            // Remove [CHUNK_<digits>] tags entirely.
+            if i + 7 < chars.len()
+                && chars[i + 1] == 'C'
+                && chars[i + 2] == 'H'
+                && chars[i + 3] == 'U'
+                && chars[i + 4] == 'N'
+                && chars[i + 5] == 'K'
+                && chars[i + 6] == '_'
+            {
+                let mut j = i + 7;
+                if j < chars.len() && chars[j].is_ascii_digit() {
+                    while j < chars.len() && chars[j].is_ascii_digit() {
+                        j += 1;
+                    }
+                    if j < chars.len() && chars[j] == ']' {
+                        i = j + 1;
+                        continue;
+                    }
+                }
+            }
+            // Drop stray '['
+            i += 1;
+            continue;
+        }
+        if chars[i] == ']' {
+            i += 1;
+            continue;
+        }
+        out.push(chars[i]);
+        i += 1;
+    }
+    out
 }

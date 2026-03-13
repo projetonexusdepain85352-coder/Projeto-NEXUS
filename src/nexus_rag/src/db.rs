@@ -59,14 +59,16 @@ pub async fn connect() -> Result<PgPool> {
         user, encoded_password, host, port, db
     );
 
-    let pool = PgPoolOptions::new()
+    let pool_future = PgPoolOptions::new()
         .max_connections(5)
         .min_connections(1)
         .acquire_timeout(std::time::Duration::from_secs(10))
         .idle_timeout(std::time::Duration::from_secs(300))
         .max_lifetime(std::time::Duration::from_secs(1800))
-        .connect(&url)
-        .await?;
+        .connect(&url);
+    let pool = tokio::time::timeout(std::time::Duration::from_secs(5), pool_future)
+        .await
+        .map_err(|_| NexusError::Config("PostgreSQL connect timeout (5s)".to_string()))??;
 
     tracing::info!(host = %host, port = %port, db = %db, user = %user, "PostgreSQL connected");
     Ok(pool)
@@ -128,6 +130,7 @@ pub async fn count_approved_documents(pool: &PgPool) -> Result<i64> {
 
 // ── Inline percent-encoder ───────────────────────────────────────────────────
 
+// Inline percent-encoder for the connection string password.
 fn url_encode(s: &str) -> String {
     let mut out = String::with_capacity(s.len() * 3);
     for byte in s.bytes() {

@@ -9,7 +9,7 @@ use serde::Serialize;
 
 pub use agent::RAGAgent;
 pub use runtime::{run_query, run_query_with_domain};
-pub use verifier::{SentenceStatus, SentenceVerification, VerificationResult, Verifier};
+pub use verifier::{VerificationResult, Verifier};
 
 #[derive(Debug, thiserror::Error)]
 pub enum AgentError {
@@ -32,6 +32,7 @@ pub type Result<T> = std::result::Result<T, AgentError>;
 pub enum DeniedReason {
     NoChunks,
     VerifierFailed,
+    InsufficientContext,
 }
 
 impl DeniedReason {
@@ -39,6 +40,7 @@ impl DeniedReason {
         match self {
             DeniedReason::NoChunks => "no_chunks",
             DeniedReason::VerifierFailed => "verifier_failed",
+            DeniedReason::InsufficientContext => "insufficient_context",
         }
     }
 }
@@ -86,5 +88,6 @@ pub enum AgentResponse {
     Denied {
         reason: DeniedReason,
         rejected_sentences: Vec<RejectedSentence>,
+        best_score: Option<f32>,
     },
 }

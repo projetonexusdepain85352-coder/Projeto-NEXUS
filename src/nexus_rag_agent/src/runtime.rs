@@ -6,7 +6,7 @@ use nexus_rag::error::NexusError;
 use nexus_rag::query::{QueryResult, run_query_with};
 
 use crate::agent::RAGAgent;
-use crate::verifier::{Verifier, rejected_sentences};
+use crate::verifier::Verifier;
 use crate::{AgentError, AgentResponse, DeniedReason, Result};
 
 const DEFAULT_TOP_K: usize = 5;
@@ -39,6 +39,7 @@ pub async fn run_query_with_domain(
             return Ok(AgentResponse::Denied {
                 reason: DeniedReason::NoChunks,
                 rejected_sentences: Vec::new(),
+                best_score: None,
             });
         }
         Err(e) => return Err(AgentError::from(e)),
@@ -49,6 +50,7 @@ pub async fn run_query_with_domain(
         return Ok(AgentResponse::Denied {
             reason: DeniedReason::NoChunks,
             rejected_sentences: Vec::new(),
+            best_score: None,
         });
     }
 
@@ -60,19 +62,30 @@ pub async fn run_query_with_domain(
 
     let response_text = call_ollama(&prompt).await?;
 
+    let insufficient = response_text
+        .trim()
+        .eq_ignore_ascii_case("Insufficient information in the provided documents.");
+    if insufficient {
+        return Ok(AgentResponse::Denied {
+            reason: DeniedReason::InsufficientContext,
+            rejected_sentences: Vec::new(),
+            best_score: None,
+        });
+    }
+
     let verifier = Verifier::new(&agent.embedder);
     let verification = verifier.verify(&response_text, &results).await;
 
-    if !verification.all_supported {
-        let rejected = rejected_sentences(&verification);
+    if !verification.supported {
         tracing::warn!(
-            rejected = ?rejected,
+            best_score = verification.best_score,
             threshold = verifier.threshold(),
             "Verifier rejected response"
         );
         return Ok(AgentResponse::Denied {
             reason: DeniedReason::VerifierFailed,
-            rejected_sentences: rejected,
+            rejected_sentences: Vec::new(),
+            best_score: Some(verification.best_score),
         });
     }
 
@@ -88,6 +101,13 @@ struct OllamaRequest {
     model: String,
     prompt: String,
     stream: bool,
+    options: OllamaOptions,
+}
+
+#[derive(Serialize)]
+struct OllamaOptions {
+    num_predict: u32,
+    temperature: f32,
 }
 
 #[derive(Deserialize)]
@@ -105,6 +125,10 @@ async fn call_ollama(prompt: &str) -> Result<String> {
         model,
         prompt: prompt.to_string(),
         stream: false,
+        options: OllamaOptions {
+            num_predict: 300,
+            temperature: 0.2,
+        },
     };
 
     let client = reqwest::Client::new();
@@ -126,24 +150,14 @@ async fn call_ollama(prompt: &str) -> Result<String> {
 fn build_prompt(system_prompt: &str, chunks: &[QueryResult], query: &str) -> String {
     let mut out = String::new();
     out.push_str(system_prompt.trim());
-    out.push_str("\n\n=== Contexto (chunks) ===\n");
+    out.push_str("\n\n[CONTEXT]\n");
 
     for (idx, chunk) in chunks.iter().enumerate() {
-        let chunk_index = chunk.chunk_index + 1;
-        let chunk_total = if chunk.chunk_total > 0 { chunk.chunk_total } else { 0 };
-        let source = format!("{} (document_id={})", chunk.source, chunk.document_id);
-        out.push_str(&format!(
-            "\n[Chunk {}]\nFonte: {} | chunk {}/{}\nConteudo:\n{}\n",
-            idx + 1,
-            source,
-            chunk_index,
-            chunk_total,
-            chunk.chunk_text
-        ));
+        out.push_str(&format!("[CHUNK_{}] {}\n\n", idx + 1, chunk.chunk_text));
     }
 
-    out.push_str("\n=== Pergunta ===\n");
+    out.push_str("[QUESTION]\n");
     out.push_str(query);
-    out.push_str("\n\n=== Resposta ===\n");
+    out.push_str("\n\n[ANSWER]\n");
     out
 }

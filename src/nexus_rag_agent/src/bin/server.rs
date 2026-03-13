@@ -16,7 +16,6 @@ use tokio::sync::{mpsc, oneshot};
 use nexus_rag_agent::{
     AgentError, AgentResponse, DeniedReason, RAGAgent, Result, SourceChunk, run_query_with_domain,
 };
-use nexus_rag_agent::verifier::VerificationResult;
 
 #[derive(Clone)]
 struct AppState {
@@ -64,6 +63,7 @@ struct QueryResponse {
     sources: Vec<SourceChunk>,
     grounded: bool,
     denied_reason: Option<String>,
+    best_score: Option<f32>,
     rejected_sentences: Vec<RejectedSentenceView>,
 }
 
@@ -86,7 +86,14 @@ impl IntoResponse for AppError {
 
 #[tokio::main]
 async fn main() {
+    load_env();
     init_logging();
+
+    if let Ok(url) = std::env::var("QDRANT_URL") {
+        if !url.trim().is_empty() {
+            tracing::info!(url = %url, "Using QDRANT_URL from environment");
+        }
+    }
 
     let agent = match spawn_agent_worker() {
         Ok(handle) => handle,
@@ -120,6 +127,10 @@ async fn main() {
     }
 }
 
+fn load_env() {
+    dotenvy::dotenv().ok();
+}
+
 fn init_logging() {
     let filter = tracing_subscriber::EnvFilter::from_default_env()
         .add_directive("nexus_rag_agent=info".parse().unwrap());
@@ -140,6 +151,7 @@ async fn handle_query(
             sources: Vec::new(),
             grounded: false,
             denied_reason: Some(DeniedReason::NoChunks.as_str().to_string()),
+            best_score: None,
             rejected_sentences: Vec::new(),
         }));
     }
@@ -156,16 +168,19 @@ async fn handle_query(
             sources: sources.iter().map(SourceChunk::from).collect(),
             grounded: true,
             denied_reason: None,
-            rejected_sentences: render_rejected(&verification),
+            best_score: Some(verification.best_score),
+            rejected_sentences: Vec::new(),
         },
         AgentResponse::Denied {
             reason,
             rejected_sentences,
+            best_score,
         } => QueryResponse {
             response: "GROUNDING_DENIED".to_string(),
             sources: Vec::new(),
             grounded: false,
             denied_reason: Some(reason.as_str().to_string()),
+            best_score,
             rejected_sentences: rejected_sentences
                 .into_iter()
                 .map(|s| RejectedSentenceView {
@@ -175,18 +190,6 @@ async fn handle_query(
                 .collect(),
         },
     }))
-}
-
-fn render_rejected(verification: &VerificationResult) -> Vec<RejectedSentenceView> {
-    verification
-        .sentences
-        .iter()
-        .filter(|s| s.status == nexus_rag_agent::SentenceStatus::Unsupported)
-        .map(|s| RejectedSentenceView {
-            sentence: s.sentence.clone(),
-            score: s.score,
-        })
-        .collect()
 }
 
 fn spawn_agent_worker() -> Result<AgentHandle> {

@@ -12,6 +12,9 @@ use qdrant_client::Qdrant;
 pub fn build_qdrant_client() -> Result<Qdrant> {
     let url =
         std::env::var("QDRANT_URL").map_err(|_| NexusError::EnvVar("QDRANT_URL".to_string()))?;
+    if url.trim().is_empty() {
+        return Err(NexusError::Config("QDRANT_URL nao pode estar vazio".to_string()));
+    }
 
     let is_production = std::env::var("NEXUS_ENV").as_deref() == Ok("production");
     if is_production && url.starts_with("http://") {
