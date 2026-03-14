@@ -5,6 +5,7 @@
 use std::{
     collections::HashMap,
     fs,
+    io::{self, Write},
     os::unix::fs::symlink,
     path::{Path, PathBuf},
 };
@@ -224,6 +225,8 @@ async fn cmd_generate_rag_dataset(
     println!("Dominio: {}", domain_label);
     println!("Output:  {}", output_path.display());
     println!("Samples por doc: {}", samples_per_doc);
+    println!("Iniciando geracao...");
+    io::stdout().flush().ok();
 
     let stats = dataset::generate_rag_dataset(pool, domain, &output_path, samples_per_doc).await?;
 

@@ -2,6 +2,7 @@ use std::{
     fs,
     io::{BufWriter, Write},
     path::{Path, PathBuf},
+    time::Duration,
 };
 
 use async_trait::async_trait;
@@ -188,7 +189,9 @@ pub async fn generate_rag_dataset(
     let model = std::env::var("NEXUS_BASE_MODEL")?;
 
     let system_prompt = nexus_rag_agent::prompts::system_prompt();
-    let client = Client::new();
+    let client = Client::builder()
+        .timeout(Duration::from_secs(120))
+        .build()?;
 
     let mut domains: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
     let mut total_pairs: usize = 0;
