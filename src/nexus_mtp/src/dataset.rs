@@ -190,12 +190,27 @@ pub async fn generate_rag_dataset(
     let system_prompt = nexus_rag_agent::prompts::system_prompt();
     let client = Client::new();
 
-    let mut examples: Vec<RagExample> = Vec::new();
     let mut domains: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
     let mut total_pairs: usize = 0;
 
-    for doc in &docs {
+    if let Some(parent) = output.parent() {
+        fs::create_dir_all(parent)?;
+    }
+
+    let file = fs::File::create(output)?;
+    let mut bw = BufWriter::new(file);
+    let total_docs = docs.len();
+
+    for (idx, doc) in docs.iter().enumerate() {
+        info!(
+            "Processando documento {}/{}: {} ({})",
+            idx + 1,
+            total_docs,
+            doc.id,
+            doc.domain
+        );
         domains.insert(doc.domain.clone());
+        let mut pairs_for_doc: usize = 0;
 
         let cleaned = clean_document_text(&doc.content);
         let chunks = chunk_text(&cleaned, CHUNK_WORDS, OVERLAP_WORDS);
@@ -230,7 +245,7 @@ pub async fn generate_rag_dataset(
                 );
                 let assistant_content = format!("{} {}", pair.resposta.trim(), citation);
 
-                examples.push(RagExample {
+                let ex = RagExample {
                     messages: vec![
                         RagMessage {
                             role: "system".to_string(),
@@ -245,10 +260,21 @@ pub async fn generate_rag_dataset(
                             content: assistant_content,
                         },
                     ],
-                });
+                };
+                let line = serde_json::to_string(&ex)?;
+                writeln!(bw, "{}", line)?;
                 total_pairs += 1;
+                pairs_for_doc += 1;
             }
         }
+
+        info!(
+            "Doc {}/{}: {} pares gerados",
+            idx + 1,
+            total_docs,
+            pairs_for_doc
+        );
+        bw.flush()?;
     }
 
     let negative_count = ((total_pairs as f32) * 0.1).round() as usize;
@@ -256,7 +282,7 @@ pub async fn generate_rag_dataset(
         let negatives = negative_questions();
         for i in 0..negative_count {
             let question = negatives[i % negatives.len()].to_string();
-            examples.push(RagExample {
+            let ex = RagExample {
                 messages: vec![
                     RagMessage {
                         role: "system".to_string(),
@@ -271,25 +297,16 @@ pub async fn generate_rag_dataset(
                         content: NEGATIVE_RESPONSE.to_string(),
                     },
                 ],
-            });
+            };
+            let line = serde_json::to_string(&ex)?;
+            writeln!(bw, "{}", line)?;
             total_pairs += 1;
         }
-    }
-
-    if let Some(parent) = output.parent() {
-        fs::create_dir_all(parent)?;
-    }
-
-    let file = fs::File::create(output)?;
-    let mut bw = BufWriter::new(file);
-    for ex in &examples {
-        let line = serde_json::to_string(ex)?;
-        writeln!(bw, "{}", line)?;
     }
     bw.flush()?;
 
     Ok(RagStats {
-        documents: docs.len(),
+        documents: total_docs,
         pairs: total_pairs,
         domains: domains.into_iter().collect(),
     })
