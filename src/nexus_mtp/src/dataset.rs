@@ -353,7 +353,19 @@ async fn generate_pairs_for_chunk(
     samples_per_doc: usize,
 ) -> Result<Vec<GeneratedQA>> {
     let prompt = format!(
-        "Dado este trecho de documentacao tecnica, gere {n} perguntas em portugues que podem ser respondidas APENAS com as informacoes presentes neste trecho. Retorne JSON array: [{{\"pergunta\": \"...\", \"resposta\": \"...\"}}]\n\nTrecho:\n{chunk}",
+        "Respond with ONLY a JSON array. No explanation, no markdown, no\n\
+extra text. Each element must have exactly two fields:\n\
+\"pergunta\" and \"resposta\".\n\n\
+Example of the ONLY valid response format:\n\
+[{{\"pergunta\":\"What is X?\",\"resposta\":\"X is...\"}},\n\
+ {{\"pergunta\":\"How does Y work?\",\"resposta\":\"Y works by...\"}}]\n\n\
+Generate {n} question-answer pairs based on this text:\n\
+{chunk}\n\n\
+RULES:\n\
+- Output ONLY the JSON array, nothing else\n\
+- No markdown code blocks\n\
+- No preamble or explanation\n\
+- Each \"resposta\" must be based ONLY on the provided text",
         n = samples_per_doc,
         chunk = chunk
     );
@@ -379,22 +391,29 @@ async fn generate_pairs_for_chunk(
 }
 
 fn parse_generated_json(text: &str) -> Result<Vec<GeneratedQA>> {
-    let trimmed = text.trim();
-    if let Ok(items) = serde_json::from_str::<Vec<GeneratedQA>>(trimmed) {
-        return Ok(items);
-    }
+    let cleaned = text
+        .trim()
+        .trim_start_matches("```json")
+        .trim_start_matches("```")
+        .trim_end_matches("```")
+        .trim();
 
-    let start = trimmed.find('[');
-    let end = trimmed.rfind(']');
-    if let (Some(s), Some(e)) = (start, end) {
-        let slice = &trimmed[s..=e];
-        if let Ok(items) = serde_json::from_str::<Vec<GeneratedQA>>(slice) {
-            return Ok(items);
+    let start = cleaned.find('[').unwrap_or(0);
+    let end = cleaned.rfind(']').map(|i| i + 1).unwrap_or(cleaned.len());
+    let json_str = &cleaned[start..end];
+
+    match serde_json::from_str::<Vec<GeneratedQA>>(json_str) {
+        Ok(items) => Ok(items),
+        Err(e) => {
+            let preview_len = json_str.len().min(200);
+            warn!(
+                "JSON invalido apos extracao: {} | raw: {}",
+                e,
+                &json_str[..preview_len]
+            );
+            Ok(Vec::new())
         }
     }
-
-    warn!("Resposta do Ollama nao e JSON valido: {}", trimmed);
-    Ok(Vec::new())
 }
 
 fn negative_questions() -> Vec<&'static str> {
